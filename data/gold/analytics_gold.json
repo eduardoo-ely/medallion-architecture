@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "total_registros": 8613,
+    "total_colunas": 52,
+    "ano_inicio": 2000,
+    "ano_fim": 2026,
+    "soma_total_reais": 29800220164449.305
+  },
+  "estatisticas_mensais": {
+    "media": 3459911780.384222,
+    "mediana": 612480310.419,
+    "q1": 137870813.40600002,
+    "q3": 2202374667.0,
+    "p10": 40821997.824,
+    "p90": 8266846496.764001,
+    "minimo": 1608348.612,
+    "maximo": 120438805119.51001,
+    "amplitude": 120437196770.89801,
+    "iiq": 2064503853.5939999,
+    "variancia": 9.162391039888807e+19,
+    "desvio_padrao": 9572037943.870054,
+    "cv_percentual": 276.6555493737786,
+    "assimetria_skew": 5.812179486491018,
+    "limite_outlier_tukey": 5299130447.391,
+    "qtd_outliers": 1248
+  },
+  "estatisticas_uf": {
+    "media": 1103711857942.567,
+    "mediana": 243093949185.575,
+    "q1": 92532230770.7139,
+    "q3": 936744973589.3175,
+    "p10": 42559803227.863106,
+    "p90": 2215781120404.515,
+    "minimo": 23003516478.5148,
+    "maximo": 11614017726948.303,
+    "amplitude": 11591014210469.787,
+    "iiq": 844212742818.6036,
+    "variancia": 5.681718031533394e+24,
+    "desvio_padrao": 2383635465320.441,
+    "cv_percentual": 215.96537612305661,
+    "assimetria_skew": 3.74798146928856,
+    "limite_outlier_tukey": 2203064087817.223,
+    "ufs_outliers": [
+      "DF",
+      "RJ",
+      "SP"
+    ]
+  },
+  "correlacoes_pearson": {
+    "cofins_vs_pis": 0.9858370276317691,
+    "ir_vs_total": 0.9813829762953707,
+    "cofins_vs_ir": 0.9413001529609277,
+    "ipi_vs_importacao": 0.9109808455423196
+  }
+}

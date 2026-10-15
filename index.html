@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline Dinâmico — Arrecadação Tributária no Brasil</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; }
+    .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+  </style>
+</head>
+<body class="min-h-screen pb-16">
+
+  <!-- TOPBAR -->
+  <header class="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-50 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-400 mb-1">
+          <span>Pipeline Dinâmico (Zero Hardcode)</span>
+          <span>•</span>
+          <span>Apresentação 16/10 (Peso 40%)</span>
+        </div>
+        <h1 class="text-xl md:text-2xl font-bold text-white">Análise de Dados da Arrecadação de Tributos no Brasil</h1>
+        <p class="text-xs text-slate-400 mt-0.5">
+          Grupo: <strong class="text-slate-200">Gabriel Fernando Simon, Paulo Henrique Garbo, Gustavo Henrique Telo e Eduardo de Paula</strong>
+        </p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M16 8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span>Carregar Planilha (.xlsx / .csv)</span>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden" />
+        </label>
+        <button onclick="carregarPlanilhaPadrao()" class="text-xs text-slate-300 hover:text-white border border-slate-700 bg-slate-800 px-3 py-2.5 rounded-lg transition">
+          Recarregar arrecadacao-estado-tratado.xlsx
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 mt-6 space-y-8">
+
+    <!-- BARRA DE STATUS DO PIPELINE -->
+    <div class="card p-4 bg-slate-900/70 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-2 text-xs font-bold">
+        <span class="px-2.5 py-1 rounded bg-amber-900/60 text-amber-300">1. BRONZE (Arquivo Bruto)</span>
+        <span class="text-slate-500">→</span>
+        <span class="px-2.5 py-1 rounded bg-slate-700 text-slate-200">2. SILVER (Limpeza & Tipagem)</span>
+        <span class="text-slate-500">→</span>
+        <span class="px-2.5 py-1 rounded bg-yellow-900/60 text-yellow-300">3. GOLD (Motor Estatístico JS/Py)</span>
+      </div>
+      <div id="statusBanner" class="text-xs font-semibold text-amber-400">
+        ⏳ Lendo arquivo arrecadacao-estado-tratado.xlsx no repositório...
+      </div>
+    </div>
+
+    <!-- ITENS A & B -->
+    <section class="grid md:grid-cols-2 gap-6">
+      <div class="card p-6">
+        <div class="text-xs font-bold uppercase text-blue-400 mb-1">Item a) Contextualização Dinâmica da Base</div>
+        <h2 class="text-lg font-bold text-white mb-3">Metadados Extraídos do Arquivo Carregado</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm mt-4">
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-slate-400 text-xs">Registros Processados (N)</div>
+            <div class="text-lg font-bold text-white" id="meta-rows">—</div>
+            <div class="text-xs text-slate-400" id="meta-period">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-slate-400 text-xs">Arrecadação Total Somada</div>
+            <div class="text-lg font-bold text-emerald-400" id="meta-sum">—</div>
+            <div class="text-xs text-slate-400" id="meta-ufs">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <div class="text-xs font-bold uppercase text-amber-400 mb-1">Item b) Relatório de Tratamento em Tempo Real (ETL)</div>
+        <h2 class="text-lg font-bold text-white mb-2">Auditoria de Qualidade dos Dados (Data Quality)</h2>
+        <ul class="text-xs text-slate-300 space-y-2 mt-3" id="etl-log">
+          <li>• Aguardando processamento da planilha...</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SELETOR DE VISÃO ESTATÍSTICA (MENSAL vs ACUMULADO POR UF) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+      <div>
+        <h3 class="text-sm font-bold text-white">Granularidade da Análise Estatística (Itens C e D): <code class="text-blue-400">Total_Arrecadacao</code></h3>
+        <p class="text-xs text-slate-400">Calculado dinamicamente a partir das linhas da planilha ativa:</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="mudarEscopo('mensal')" id="btn-mensal" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white">Registros Mensais (Microdados)</button>
+        <button onclick="mudarEscopo('uf')" id="btn-uf" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600">Agregado por UF (Soma das UFs)</button>
+      </div>
+    </div>
+
+    <!-- ITENS C & D: TENDÊNCIA CENTRAL, POSIÇÃO E DISPERSÃO -->
+    <section class="grid md:grid-cols-2 gap-6">
+      <div class="card p-6 border-t-4 border-t-emerald-500">
+        <div class="text-xs font-bold uppercase text-emerald-400 mb-1">Item c) Aula 04/09 — Tendência Central e Posição</div>
+        <h2 class="text-lg font-bold text-white mb-4" id="title-c">Medidas Calculadas</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Média Aritmética (x̄)</div>
+            <div class="text-base font-bold text-white" id="c-media">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg border border-emerald-500/40">
+            <div class="text-xs text-emerald-300">Mediana (Md / Q2 - 50%)</div>
+            <div class="text-base font-bold text-emerald-400" id="c-mediana">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">1º Quartil (Q1 - 25%)</div>
+            <div class="text-base font-bold text-white" id="c-q1">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">3º Quartil (Q3 - 75%)</div>
+            <div class="text-base font-bold text-white" id="c-q3">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Percentil 10 (P10) e Mínimo</div>
+            <div class="text-xs font-bold text-slate-200 mt-1" id="c-min">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Percentil 90 (P90) e Máximo</div>
+            <div class="text-xs font-bold text-slate-200 mt-1" id="c-max">—</div>
+          </div>
+        </div>
+        <div class="bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-3 text-xs text-emerald-200" id="c-insight">—</div>
+      </div>
+
+      <div class="card p-6 border-t-4 border-t-amber-500">
+        <div class="text-xs font-bold uppercase text-amber-400 mb-1">Item d) Aula 11/09 — Dispersão e Variabilidade</div>
+        <h2 class="text-lg font-bold text-white mb-4" id="title-d">Variabilidade Calculada</h2>
+        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Desvio Padrão Amostral (s)</div>
+            <div class="text-base font-bold text-white" id="d-std">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg border border-amber-500/40">
+            <div class="text-xs text-amber-300">Coeficiente de Variação (CV)</div>
+            <div class="text-base font-bold text-amber-400" id="d-cv">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Amplitude Total (Máx - Mín)</div>
+            <div class="text-base font-bold text-white" id="d-amp">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Intervalo Interquartil (IIQ)</div>
+            <div class="text-base font-bold text-white" id="d-iiq">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Variância Amostral (s²)</div>
+            <div class="text-xs font-bold text-slate-200 mt-1" id="d-var">—</div>
+          </div>
+          <div class="bg-slate-800/80 p-3 rounded-lg">
+            <div class="text-xs text-slate-400">Assimetria (Skewness)</div>
+            <div class="text-xs font-bold text-slate-200 mt-1" id="d-skew">—</div>
+          </div>
+        </div>
+        <div class="bg-amber-950/40 border border-amber-800/60 rounded-lg p-3 text-xs text-amber-200" id="d-insight">—</div>
+      </div>
+    </section>
+
+    <!-- GRÁFICOS DINÂMICOS -->
+    <section class="grid lg:grid-cols-2 gap-6">
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span class="text-xs font-bold text-purple-400 uppercase">Ranking por UF & Critério de Tukey</span>
+            <h3 class="text-base font-bold text-white">Total por UF vs. Limite de Outlier (Vermelho)</h3>
+          </div>
+          <span id="badge-outliers-uf" class="text-xs bg-rose-950 text-rose-300 border border-rose-700 px-2.5 py-1 rounded font-semibold">—</span>
+        </div>
+        <div class="h-80"><canvas id="chartUF"></canvas></div>
+      </div>
+
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span class="text-xs font-bold text-blue-400 uppercase">Evolução Temporal Agregada</span>
+            <h3 class="text-base font-bold text-white">Série Histórica Anual Calculada (R$ Bilhões)</h3>
+          </div>
+          <span id="badge-pico-ano" class="text-xs bg-blue-950 text-blue-300 border border-blue-700 px-2.5 py-1 rounded font-semibold">—</span>
+        </div>
+        <div class="h-80"><canvas id="chartAno"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ITEM E: TABELA DE FREQUÊNCIAS, HISTOGRAMA E OUTLIERS -->
+    <section class="grid lg:grid-cols-2 gap-6">
+      <div class="card p-6">
+        <div class="text-xs font-bold uppercase text-purple-400 mb-1">Item e) Aula 18/09 — Tabela de Frequências e Outliers</div>
+        <h2 class="text-lg font-bold text-white mb-3">Distribuição de Frequências (Calculada ao Vivo)</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400">
+                <th class="py-2 px-2">Classe de Arrecadação Mensal</th>
+                <th class="py-2 px-2 text-right">fi</th>
+                <th class="py-2 px-2 text-right">fri (%)</th>
+                <th class="py-2 px-2 text-right">Fi</th>
+                <th class="py-2 px-2 text-right">Fri (%)</th>
+              </tr>
+            </thead>
+            <tbody id="freq-tbody" class="divide-y divide-slate-800 text-slate-200"></tbody>
+          </table>
+        </div>
+        <div id="outliers-box" class="mt-4 bg-purple-950/40 border border-purple-800/60 rounded-lg p-3 text-xs text-purple-200">—</div>
+      </div>
+
+      <div class="card p-6 flex flex-col justify-between">
+        <div>
+          <span class="text-xs font-bold text-purple-400 uppercase">Item e) Histograma Dinâmico</span>
+          <h3 class="text-base font-bold text-white mb-3">Frequência Absoluta por Classe</h3>
+        </div>
+        <div class="h-72"><canvas id="chartHist"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ITEM F: ASSOCIAÇÃO REGIONAL E MATRIZ DE CORRELAÇÃO DE PEARSON -->
+    <section class="grid lg:grid-cols-2 gap-6">
+      <div class="card p-6 border-t-4 border-t-rose-500">
+        <div class="text-xs font-bold uppercase text-rose-400 mb-1">Item f) Aula 25/09 — Cruzamento Qualitativo × Quantitativo</div>
+        <h2 class="text-lg font-bold text-white mb-3">Arrecadação e Variabilidade por Macrorregião</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400">
+                <th class="py-2 px-2">Região</th>
+                <th class="py-2 px-2 text-right">Soma Total</th>
+                <th class="py-2 px-2 text-right">Part. (%)</th>
+                <th class="py-2 px-2 text-right">Média Mensal</th>
+                <th class="py-2 px-2 text-right">CV (%)</th>
+              </tr>
+            </thead>
+            <tbody id="regiao-tbody" class="divide-y divide-slate-800 text-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-6 border-t-4 border-t-cyan-500">
+        <div class="text-xs font-bold uppercase text-cyan-400 mb-1">Item f) Coeficiente de Correlação de Pearson (r)</div>
+        <h2 class="text-lg font-bold text-white mb-3">Correlações Calculadas Linha a Linha na Planilha</h2>
+        <div id="corr-container" class="space-y-3 text-xs"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const REGIAO_MAP = {
+      AC:'Norte', AP:'Norte', AM:'Norte', PA:'Norte', RO:'Norte', RR:'Norte', TO:'Norte',
+      AL:'Nordeste', BA:'Nordeste', CE:'Nordeste', MA:'Nordeste', PB:'Nordeste', PE:'Nordeste', PI:'Nordeste', RN:'Nordeste', SE:'Nordeste',
+      DF:'Centro-Oeste', GO:'Centro-Oeste', MT:'Centro-Oeste', MS:'Centro-Oeste',
+      ES:'Sudeste', MG:'Sudeste', RJ:'Sudeste', SP:'Sudeste',
+      PR:'Sul', RS:'Sul', SC:'Sul'
+    };
+
+    let globalState = { mensal: null, uf: null };
+    let escopoAtivo = 'mensal';
+    let chartUFInstance, chartAnoInstance, chartHistInstance;
+
+    function fmtBRL(val) {
+      const abs = Math.abs(val);
+      if (abs >= 1e12) return 'R$ ' + (val / 1e12).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tri';
+      if (abs >= 1e9)  return 'R$ ' + (val / 1e9).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bi';
+      if (abs >= 1e6)  return 'R$ ' + (val / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Mi';
+      return 'R$ ' + val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function calcQuantile(sortedArr, q) {
+      const pos = (sortedArr.length - 1) * q;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      if (sortedArr[base + 1] !== undefined) {
+        return sortedArr[base] + rest * (sortedArr[base + 1] - sortedArr[base]);
+      }
+      return sortedArr[base];
+    }
+
+    function calcularEstatisticasVetor(items) {
+      const sorted = [...items].sort((a, b) => a.val - b.val);
+      const vals = sorted.map(d => d.val);
+      const n = vals.length;
+      const sum = vals.reduce((a, b) => a + b, 0);
+      const mean = sum / n;
+      const median = calcQuantile(vals, 0.50);
+      const q1 = calcQuantile(vals, 0.25);
+      const q3 = calcQuantile(vals, 0.75);
+      const p10 = calcQuantile(vals, 0.10);
+      const p90 = calcQuantile(vals, 0.90);
+      const minObj = sorted[0];
+      const maxObj = sorted[n - 1];
+      const amp = maxObj.val - minObj.val;
+      const iiq = q3 - q1;
+
+      let m2 = 0, m3 = 0;
+      for (let i = 0; i < n; i++) {
+        const diff = vals[i] - mean;
+        m2 += diff * diff;
+        m3 += diff * diff * diff;
+      }
+      const variance = m2 / (n - 1);
+      const std = Math.sqrt(variance);
+      const cv = (std / mean) * 100;
+      const skew = (n / ((n - 1) * (n - 2))) * (m3 / Math.pow(std, 3));
+
+      const lsTukey = q3 + 1.5 * iiq;
+      const outliers = sorted.filter(d => d.val > lsTukey);
+
+      return { n, sum, mean, median, q1, q3, p10, p90, minObj, maxObj, amp, iiq, variance, std, cv, skew, lsTukey, outliers };
+    }
+
+    function calcPearson(x, y) {
+      const n = x.length;
+      let sumX = 0, sumY = 0;
+      for (let i = 0; i < n; i++) { sumX += x[i]; sumY += y[i]; }
+      const meanX = sumX / n, meanY = sumY / n;
+      let num = 0, denX = 0, denY = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = x[i] - meanX;
+        const dy = y[i] - meanY;
+        num += dx * dy;
+        denX += dx * dx;
+        denY += dy * dy;
+      }
+      return num / Math.sqrt(denX * denY);
+    }
+
+    function processarWorkbook(workbook, nomeArquivo) {
+      const sheetName = workbook.SheetNames.includes('Dados_Ajustados') ? 'Dados_Ajustados' : workbook.SheetNames[0];
+      const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
+      if (!rawRows.length) return alert('A planilha selecionada está vazia!');
+
+      let celulasNulasCorrigidas = 0;
+      let valoresNegativosRestituicao = 0;
+      const ignoreCols = new Set(['Ano', 'Mês', 'Mês_Num', 'UF', 'Regiao', 'Total_Arrecadacao']);
+      const allCols = Object.keys(rawRows[0]);
+      const taxCols = allCols.filter(c => !ignoreCols.has(c));
+
+      const silverRows = rawRows.map(r => {
+        const uf = String(r['UF'] || '').trim().toUpperCase();
+        const ano = parseInt(r['Ano'], 10) || 0;
+        const mes = String(r['Mês'] || '').trim();
+        const regiao = REGIAO_MAP[uf] || 'Outros';
+
+        let somaImpostos = 0;
+        taxCols.forEach(col => {
+          let v = r[col];
+          if (v === null || v === undefined || v === '') { celulasNulasCorrigidas++; v = 0; }
+          const num = Number(v) || 0;
+          if (num < 0) valoresNegativosRestituicao++;
+          somaImpostos += num;
+        });
+
+        const total = (r['Total_Arrecadacao'] !== undefined && r['Total_Arrecadacao'] !== '')
+          ? Number(r['Total_Arrecadacao'])
+          : somaImpostos;
+
+        const irTotal = (Number(r['IRPF'])||0) + (Number(r['IRPJ - ENTIDADES FINANCEIRAS'])||0) +
+                        (Number(r['IRPJ - DEMAIS EMPRESAS'])||0) + (Number(r['IRRF - RENDIMENTOS DO TRABALHO'])||0) +
+                        (Number(r['IRRF - RENDIMENTOS DO CAPITAL'])||0) + (Number(r['IRRF - REMESSAS P/ EXTERIOR'])||0) +
+                        (Number(r['IRRF - OUTROS RENDIMENTOS'])||0);
+        const cofinsTotal = (Number(r['COFINS'])||0) + (Number(r['COFINS - FINANCEIRAS'])||0) + (Number(r['COFINS - DEMAIS'])||0);
+        const pisTotal = (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP'])||0) + (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP - FINANCEIRAS'])||0) + (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP - DEMAIS'])||0);
+        const ipiTotal = (Number(r['IPI - FUMO'])||0) + (Number(r['IPI - BEBIDAS'])||0) + (Number(r['IPI - AUTOMÓVEIS'])||0) + (Number(r['IPI - VINCULADO À IMPORTACAO'])||0) + (Number(r['IPI - OUTROS'])||0);
+        const impImportacao = Number(r['IMPOSTO SOBRE IMPORTAÇÃO']) || 0;
+
+        return { uf, ano, mes, regiao, total, irTotal, cofinsTotal, pisTotal, ipiTotal, impImportacao };
+      }).filter(r => r.uf && r.ano > 0);
+
+      const itemsMensal = silverRows.map(r => ({ val: r.total, label: `${r.uf} (${r.mes}/${r.ano})` }));
+      const statsMensal = calcularEstatisticasVetor(itemsMensal);
+
+      const mapUF = {};
+      silverRows.forEach(r => { mapUF[r.uf] = (mapUF[r.uf] || 0) + r.total; });
+      const itemsUF = Object.entries(mapUF).map(([uf, val]) => ({ val, label: uf })).sort((a, b) => b.val - a.val);
+      const statsUF = calcularEstatisticasVetor(itemsUF);
+
+      const mapAno = {};
+      silverRows.forEach(r => { mapAno[r.ano] = (mapAno[r.ano] || 0) + r.total; });
+      const serieAno = Object.entries(mapAno).map(([ano, val]) => ({ ano: Number(ano), val: val / 1e9 })).sort((a, b) => a.ano - b.ano);
+
+      globalState = { mensal: statsMensal, uf: statsUF };
+
+      const anosUnicos = serieAno.map(d => d.ano);
+      document.getElementById('statusBanner').className = 'text-xs font-semibold text-emerald-400';
+      document.getElementById('statusBanner').innerText = `✔ Processado ao vivo da planilha: ${nomeArquivo} (Aba: ${sheetName} | ${silverRows.length.toLocaleString('pt-BR')} linhas × ${allCols.length} colunas)`;
+      document.getElementById('meta-rows').innerText = `${silverRows.length.toLocaleString('pt-BR')} linhas`;
+      document.getElementById('meta-period').innerText = `Período: ${Math.min(...anosUnicos)} a ${Math.max(...anosUnicos)} (${anosUnicos.length} anos)`;
+      document.getElementById('meta-sum').innerText = fmtBRL(statsMensal.sum);
+      document.getElementById('meta-ufs').innerText = `${itemsUF.length} Unidades da Federação × ${taxCols.length} rubricas`;
+
+      document.getElementById('etl-log').innerHTML = `
+        <li>✔ <strong>Validação de Schema:</strong> ${allCols.length} colunas validadas (${taxCols.length} rubricas tributárias).</li>
+        <li>✔ <strong>Limpeza de Nulos:</strong> ${celulasNulasCorrigidas} células vazias convertidas para <code>0.00</code>.</li>
+        <li>✔ <strong>Retificações Contábeis:</strong> ${valoresNegativosRestituicao} registros negativos preservados (restituições oficiais RFB).</li>
+        <li>✔ <strong>Feature Engineering:</strong> Mapeamento automático das 27 UFs nas 5 Macrorregiões e cálculo de <code>Total_Arrecadacao</code>.</li>
+      `;
+
+      const faixas = [
+        { nome: 'Até R$ 100 milhões', min: -Infinity, max: 1e8, fi: 0 },
+        { nome: 'R$ 100 mi a R$ 500 mi', min: 1e8, max: 5e8, fi: 0 },
+        { nome: 'R$ 500 mi a R$ 1 bi', min: 5e8, max: 1e9, fi: 0 },
+        { nome: 'R$ 1 bi a R$ 5 bilhões', min: 1e9, max: 5e9, fi: 0 },
+        { nome: 'R$ 5 bi a R$ 20 bilhões', min: 5e9, max: 2e10, fi: 0 },
+        { nome: 'Acima de R$ 20 bilhões', min: 2e10, max: Infinity, fi: 0 }
+      ];
+      silverRows.forEach(r => {
+        const f = faixas.find(b => r.total > b.min && r.total <= b.max);
+        if (f) f.fi++;
+      });
+      const maxFi = Math.max(...faixas.map(f => f.fi));
+      let acumFi = 0;
+      document.getElementById('freq-tbody').innerHTML = faixas.map(f => {
+        acumFi += f.fi;
+        const fri = (f.fi / silverRows.length) * 100;
+        const Fri = (acumFi / silverRows.length) * 100;
+        const isModal = f.fi === maxFi;
+        return `<tr class="${isModal ? 'bg-purple-950/40 font-bold text-purple-200' : ''}">
+          <td class="py-2 px-2">${f.nome} ${isModal ? '(Classe Modal)' : ''}</td>
+          <td class="py-2 px-2 text-right">${f.fi.toLocaleString('pt-BR')}</td>
+          <td class="py-2 px-2 text-right">${fri.toFixed(2)}%</td>
+          <td class="py-2 px-2 text-right">${acumFi.toLocaleString('pt-BR')}</td>
+          <td class="py-2 px-2 text-right">${Fri.toFixed(2)}%</td>
+        </tr>`;
+      }).join('');
+
+      const ufsOutliersNomes = statsUF.outliers.map(d => `${d.label} (${fmtBRL(d.val)})`).reverse().join(', ');
+      document.getElementById('outliers-box').innerHTML = `
+        <strong>Outliers Calculados Dinamicamente (Tukey: LS = Q3 + 1,5 × IIQ):</strong><br/>
+        • <strong>No Acumulado por UF (LS = ${fmtBRL(statsUF.lsTukey)}):</strong> ${statsUF.outliers.length} estados atípicos → <strong>${ufsOutliersNomes}</strong>.<br/>
+        • <strong>Nos Microdados Mensais (LS = ${fmtBRL(statsMensal.lsTukey)}):</strong> <strong>${statsMensal.outliers.length.toLocaleString('pt-BR')} meses atípicos</strong> (${((statsMensal.outliers.length / statsMensal.n)*100).toFixed(2)}% do total).
+      `;
+      document.getElementById('badge-outliers-uf').innerText = `Outliers (> ${fmtBRL(statsUF.lsTukey)}): ${statsUF.outliers.map(d => d.label).reverse().join(', ')}`;
+
+      const picoAnoObj = [...serieAno].sort((a, b) => b.val - a.val)[0];
+      document.getElementById('badge-pico-ano').innerText = `Pico: ${picoAnoObj.ano} (R$ ${picoAnoObj.val.toFixed(2)} Bi)`;
+
+      const gruposRegiao = {};
+      silverRows.forEach(r => {
+        if (!gruposRegiao[r.regiao]) gruposRegiao[r.regiao] = [];
+        gruposRegiao[r.regiao].push({ val: r.total, label: r.uf });
+      });
+      const listaRegioes = Object.entries(gruposRegiao).map(([reg, arr]) => {
+        const st = calcularEstatisticasVetor(arr);
+        return { reg, sum: st.sum, share: (st.sum / statsMensal.sum) * 100, mean: st.mean, cv: st.cv };
+      }).sort((a, b) => b.sum - a.sum);
+
+      document.getElementById('regiao-tbody').innerHTML = listaRegioes.map(r => `
+        <tr>
+          <td class="py-2 px-2 font-semibold text-white">${r.reg}</td>
+          <td class="py-2 px-2 text-right">${fmtBRL(r.sum)}</td>
+          <td class="py-2 px-2 text-right text-emerald-400 font-semibold">${r.share.toFixed(2)}%</td>
+          <td class="py-2 px-2 text-right">${fmtBRL(r.mean)}</td>
+          <td class="py-2 px-2 text-right">${r.cv.toFixed(2)}%</td>
+        </tr>
+      `).join('');
+
+      const vecTotal = silverRows.map(r => r.total);
+      const vecIR = silverRows.map(r => r.irTotal);
+      const vecCofins = silverRows.map(r => r.cofinsTotal);
+      const vecPis = silverRows.map(r => r.pisTotal);
+      const vecIpi = silverRows.map(r => r.ipiTotal);
+      const vecImp = silverRows.map(r => r.impImportacao);
+
+      const paresCorr = [
+        { nome: 'COFINS Total × PIS/PASEP Total', desc: 'Tributos incidentes sobre o faturamento empresarial', r: calcPearson(vecCofins, vecPis) },
+        { nome: 'Imposto de Renda Total × Arrecadação Total', desc: 'Impacto direto do IR na receita total do Estado', r: calcPearson(vecIR, vecTotal) },
+        { nome: 'COFINS Total × Imposto de Renda Total', desc: 'Associação entre faturamento corporativo e renda/lucro', r: calcPearson(vecCofins, vecIR) },
+        { nome: 'IPI Total × Imposto sobre Importação', desc: 'Relação entre atividade industrial e comércio externo', r: calcPearson(vecIpi, vecImp) }
+      ];
+      document.getElementById('corr-container').innerHTML = paresCorr.map(p => `
+        <div class="bg-slate-800/80 p-3 rounded-lg flex items-center justify-between">
+          <div>
+            <div class="font-bold text-white">${p.nome}</div>
+            <div class="text-slate-400">${p.desc}</div>
+          </div>
+          <span class="text-base font-extrabold text-emerald-400">r = ${p.r.toFixed(4).replace('.', ',')}</span>
+        </div>
+      `).join('');
+
+      mudarEscopo(escopoAtivo);
+      desenharGraficos(itemsUF, statsUF.lsTukey, serieAno, faixas);
+    }
+
+    function mudarEscopo(escopo) {
+      escopoAtivo = escopo;
+      document.getElementById('btn-mensal').className = escopo === 'mensal' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300';
+      document.getElementById('btn-uf').className = escopo === 'uf' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300';
+
+      const st = globalState[escopo];
+      if (!st) return;
+
+      const sufixo = escopo === 'mensal' ? `(Microdados Mensais N = ${st.n.toLocaleString('pt-BR')})` : `(Acumulado por UF N = ${st.n})`;
+      document.getElementById('title-c').innerText = `Medidas de Posição ${sufixo}`;
+      document.getElementById('title-d').innerText = `Medidas de Dispersão ${sufixo}`;
+
+      document.getElementById('c-media').innerText = fmtBRL(st.mean);
+      document.getElementById('c-mediana').innerText = fmtBRL(st.median);
+      document.getElementById('c-q1').innerText = fmtBRL(st.q1);
+      document.getElementById('c-q3').innerText = fmtBRL(st.q3);
+      document.getElementById('c-min').innerText = `P10: ${fmtBRL(st.p10)} | Mín: ${fmtBRL(st.minObj.val)} (${st.minObj.label})`;
+      document.getElementById('c-max').innerText = `P90: ${fmtBRL(st.p90)} | Máx: ${fmtBRL(st.maxObj.val)} (${st.maxObj.label})`;
+
+      document.getElementById('d-std').innerText = fmtBRL(st.std);
+      document.getElementById('d-cv').innerText = `${st.cv.toFixed(2).replace('.', ',')}%`;
+      document.getElementById('d-amp').innerText = fmtBRL(st.amp);
+      document.getElementById('d-iiq').innerText = fmtBRL(st.iiq);
+      document.getElementById('d-var').innerText = `${st.variance.toExponential(4).replace('.', ',')} (R$)²`;
+      document.getElementById('d-skew').innerText = `+${st.skew.toFixed(2).replace('.', ',')} (Assimetria Positiva)`;
+
+      document.getElementById('c-insight').innerHTML = `<strong>Análise Automática:</strong> A Média (${fmtBRL(st.mean)}) é <strong>${(st.mean / st.median).toFixed(1)}x maior</strong> que a Mediana (${fmtBRL(st.median)}), confirmando que poucos valores extremos puxam a média para cima.`;
+      document.getElementById('d-insight').innerHTML = `<strong>Análise Automática:</strong> Coeficiente de Variação de <strong>${st.cv.toFixed(2).replace('.', ',')}%</strong> (muito acima do limiar de 30%), comprovando matematicamente a elevada dispersão regional e temporal.`;
+    }
+
+    function desenharGraficos(itemsUF, lsTukeyUF, serieAno, faixas) {
+      Chart.defaults.color = '#94a3b8';
+      Chart.defaults.borderColor = '#334155';
+
+      if (chartUFInstance) chartUFInstance.destroy();
+      chartUFInstance = new Chart(document.getElementById('chartUF'), {
+        type: 'bar',
+        data: {
+          labels: itemsUF.map(d => d.label),
+          datasets: [{
+            label: 'Total Acumulado (R$ Bi)',
+            data: itemsUF.map(d => +(d.val / 1e9).toFixed(2)),
+            backgroundColor: itemsUF.map(d => d.val > lsTukeyUF ? '#f43f5e' : '#3b82f6'),
+            borderRadius: 4
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      if (chartAnoInstance) chartAnoInstance.destroy();
+      chartAnoInstance = new Chart(document.getElementById('chartAno'), {
+        type: 'line',
+        data: {
+          labels: serieAno.map(d => d.ano),
+          datasets: [{
+            label: 'Arrecadação Anual (R$ Bi)',
+            data: serieAno.map(d => +d.val.toFixed(2)),
+            borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true, tension: 0.25, pointRadius: 3
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      if (chartHistInstance) chartHistInstance.destroy();
+      chartHistInstance = new Chart(document.getElementById('chartHist'), {
+        type: 'bar',
+        data: {
+          labels: faixas.map(f => f.nome.replace('R$ ', '')),
+          datasets: [{
+            label: 'Frequência Absoluta (fi)',
+            data: faixas.map(f => f.fi),
+            backgroundColor: '#a855f7', borderRadius: 4
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+    }
+
+    async function carregarPlanilhaPadrao() {
+      try {
+        document.getElementById('statusBanner').innerText = '⏳ Lendo arrecadacao-estado-tratado.xlsx diretamente do repositório...';
+        const resp = await fetch('./arrecadacao-estado-tratado.xlsx');
+        if (!resp.ok) throw new Error('Arquivo não encontrado no mesmo diretório');
+        const buf = await resp.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        processarWorkbook(wb, 'arrecadacao-estado-tratado.xlsx');
+      } catch (err) {
+        document.getElementById('statusBanner').className = 'text-xs font-semibold text-amber-400';
+        document.getElementById('statusBanner').innerText = '⚠️ Abra via GitHub Pages/Live Server ou clique em "Carregar Planilha" no topo para selecionar o arquivo .xlsx!';
+      }
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+        processarWorkbook(wb, file.name);
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    carregarPlanilhaPadrao();
+  </script>
+</body>
+</html>
