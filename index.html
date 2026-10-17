@@ -1,755 +1,395 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pipeline Dinâmico — Arrecadação Tributária no Brasil</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <style>
-    body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; scroll-behavior: smooth; }
-    .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arrecadação Tributária no Brasil — Análise de Dados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--ink:#12263a;--mut:#5b6b7b;--line:#dbe2e8;--pri:#0f6b6b;--pri2:#e3f1f0;--acc:#c98a1b;--neg:#b3412e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 'Source Sans 3',system-ui,sans-serif}
+h1,h2,h3{font-family:'Source Serif 4',Georgia,serif;font-weight:600;margin:0;line-height:1.25}
+h3{font-size:1.08rem;margin-bottom:10px}
+.app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+nav{background:var(--ink);color:#cfd9e3;padding:26px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px}
+nav h1{color:#fff;font-size:1.2rem}
+nav p{margin:6px 0 0;font-size:.82rem;color:#93a4b5}
+#tabs{display:flex;flex-direction:column;gap:2px}
+#tabs button{all:unset;cursor:pointer;padding:9px 12px;border-radius:6px;font-size:.92rem;border-left:3px solid transparent}
+#tabs button:hover{background:#1b3550}
+#tabs button.on{background:#1b3550;color:#fff;border-left-color:var(--acc);font-weight:600}
+#tabs button:focus-visible,.btn:focus-within{outline:2px solid var(--acc)}
+.src{margin-top:auto;font-size:.8rem;color:#93a4b5}
+.btn{display:inline-block;cursor:pointer;background:#1b3550;color:#fff;padding:8px 12px;border-radius:6px;margin-bottom:8px;font-size:.85rem}
+main{padding:28px 34px 60px;min-width:0}
+.top{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:flex-end;margin-bottom:20px}
+.top h2{font-size:1.65rem}.top p{margin:4px 0 0;color:var(--mut);max-width:640px}
+#scopebar{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--mut)}
+select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:18px;min-width:0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.g2>.card{margin-bottom:0}.g2{margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--pri);border-radius:8px;padding:13px 15px}
+.kpi small{display:block;color:var(--mut);font-size:.8rem}
+.kpi b{display:block;font-size:1.3rem;font-variant-numeric:tabular-nums;margin:2px 0}
+.kpi span{font-size:.78rem;color:var(--mut)}
+.cv{position:relative;height:340px}.cv.s{height:280px}
+table{width:100%;border-collapse:collapse;font-size:.88rem;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}
+th{background:#f6f8fa;font-weight:600;color:var(--mut);font-size:.8rem}
+.num td:not(:first-child),.num th:not(:first-child){text-align:right}
+.scr{max-height:320px;overflow:auto}.wide{overflow-x:auto}
+.note{background:var(--pri2);border-left:4px solid var(--pri);padding:13px 16px;border-radius:0 8px 8px 0;margin-bottom:18px}
+.note b{display:block;margin-bottom:3px}
+.sub{color:var(--mut);font-size:.85rem;margin:-4px 0 10px}
+ul{margin:0;padding-left:20px}li{margin-bottom:6px}
+.ok{color:var(--pri);font-weight:600}.warn{color:var(--acc);font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px;font-size:.88rem}
+#empty{max-width:640px}
+@media(max-width:900px){
+ .app{grid-template-columns:1fr}
+ nav{position:static;height:auto;gap:14px}
+ #tabs{flex-direction:row;overflow-x:auto}#tabs button{white-space:nowrap}
+ main{padding:20px 14px 50px}.g2{grid-template-columns:1fr}
+}
+</style>
 </head>
-<body class="min-h-screen pb-16">
-
-  <!-- TOPBAR -->
-  <header class="border-b border-slate-800 bg-slate-900/95 sticky top-0 z-50 backdrop-blur">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-400 mb-1">
-          <span>Pipeline Dinâmico (Zero Hardcode)</span>
-          <span>•</span>
-          <span>Apresentação 16/10 (Peso 40%)</span>
-        </div>
-        <h1 class="text-xl md:text-2xl font-bold text-white">Análise de Dados da Arrecadação de Tributos no Brasil</h1>
-        <p class="text-xs text-slate-400 mt-0.5">
-          Grupo: <strong class="text-slate-200">Gabriel Fernando Simon, Paulo Henrique Garbo, Gustavo Henrique Telo e Eduardo de Paula</strong>
-        </p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M16 8l-4-4m0 0L8 8m4-4v12"/></svg>
-          <span>Carregar Planilha (.xlsx / .csv)</span>
-          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden" />
-        </label>
-        <button onclick="carregarPlanilhaPadrao()" class="text-xs text-slate-300 hover:text-white border border-slate-700 bg-slate-800 px-3 py-2.5 rounded-lg transition">
-          Recarregar arrecadacao-estado-tratado.xlsx
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="max-w-7xl mx-auto px-4 mt-6 space-y-8">
-
-    <!-- BARRA DE STATUS DO PIPELINE -->
-    <div class="card p-4 bg-slate-900/70 flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-2 text-xs font-bold">
-        <span class="px-2.5 py-1 rounded bg-amber-900/60 text-amber-300">1. BRONZE (Arquivo Bruto)</span>
-        <span class="text-slate-500">→</span>
-        <span class="px-2.5 py-1 rounded bg-slate-700 text-slate-200">2. SILVER (Limpeza & Tipagem)</span>
-        <span class="text-slate-500">→</span>
-        <span class="px-2.5 py-1 rounded bg-yellow-900/60 text-yellow-300">3. GOLD (Motor Estatístico JS/Py)</span>
-      </div>
-      <div id="statusBanner" class="text-xs font-semibold text-amber-400">
-        ⏳ Lendo arquivo arrecadacao-estado-tratado.xlsx diretamente do repositório...
-      </div>
+<body>
+<div class="app">
+<nav>
+  <div><h1>Arrecadação tributária no Brasil</h1><p>Análise exploratória de dados</p></div>
+  <div id="tabs"></div>
+  <div class="src">
+    <label class="btn">Carregar outra planilha<input type="file" id="file" accept=".xlsx,.xls,.csv" hidden></label>
+    <div id="st">Aguardando dados…</div>
+  </div>
+</nav>
+<main>
+  <div id="empty" class="card" style="display:none"></div>
+  <div id="content" style="display:none">
+    <div class="top">
+      <div><h2 id="ttl"></h2><p id="sub"></p></div>
+      <div id="scopebar"><label for="scope">Unidade de análise</label><select id="scope"></select></div>
     </div>
 
-    <!-- ITENS A & B -->
-    <section class="grid md:grid-cols-2 gap-6">
-      <div class="card p-6 border-t-4 border-t-blue-500">
-        <div class="text-xs font-bold uppercase text-blue-400 mb-1">Item a) Contextualização Dinâmica da Base</div>
-        <h2 class="text-lg font-bold text-white mb-3">Metadados Extraídos da Planilha Carregada</h2>
-        <div class="grid grid-cols-2 gap-3 text-sm mt-4">
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-slate-400 text-xs">Registros Processados (N)</div>
-            <div class="text-lg font-bold text-white" id="meta-rows">—</div>
-            <div class="text-xs text-slate-400" id="meta-period">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-slate-400 text-xs">Arrecadação Total Somada</div>
-            <div class="text-lg font-bold text-emerald-400" id="meta-sum">—</div>
-            <div class="text-xs text-slate-400" id="meta-ufs">—</div>
-          </div>
+    <section id="t1">
+      <div class="g2">
+        <div class="card">
+          <h3>Contexto</h3>
+          <p>A arrecadação tributária financia saúde, educação, segurança, infraestrutura e assistência social, e reúne tributos administrados pela União, pelos estados e pelos municípios.</p>
+          <p>Em tabelas isoladas, é difícil enxergar tendências, diferenças regionais e mudanças relevantes. Este painel transforma a série de arrecadação por Unidade da Federação (UF) em indicadores e gráficos.</p>
+          <p class="sub" style="margin:0">Grupo: Gabriel Fernando Simon, Paulo Henrique Garbo, Gustavo Henrique Telo e Eduardo de Paula.</p>
+        </div>
+        <div class="card">
+          <h3>Objetivos</h3>
+          <ul>
+            <li>Organizar os dados de arrecadação tributária brasileira.</li>
+            <li>Analisar a evolução da arrecadação ao longo dos anos.</li>
+            <li>Identificar os principais tributos e sua participação no total.</li>
+            <li>Comparar estados e regiões, apontando diferenças e padrões.</li>
+            <li>Calcular indicadores: total, crescimento percentual e participação por tributo.</li>
+            <li>Identificar tendências e variações no período.</li>
+          </ul>
         </div>
       </div>
+      <div class="kpis" id="k1"></div>
+      <div class="card"><h3>Base de dados</h3><div id="src1"></div></div>
+    </section>
 
-      <div class="card p-6 border-t-4 border-t-amber-500">
-        <div class="text-xs font-bold uppercase text-amber-400 mb-1">Item b) Relatório de Tratamento em Tempo Real (ETL)</div>
-        <h2 class="text-lg font-bold text-white mb-2">Auditoria de Qualidade dos Dados (Data Quality)</h2>
-        <ul class="text-xs text-slate-300 space-y-2 mt-3" id="etl-log">
-          <li>• Aguardando leitura da planilha...</li>
-        </ul>
+    <section id="t2">
+      <div class="card"><h3>Verificações de qualidade</h3><div class="wide" id="qa"></div></div>
+      <div class="g2">
+        <div class="card"><h3>Transformações aplicadas</h3><ul id="tr"></ul></div>
+        <div class="card"><h3>Agrupamento das colunas de tributos</h3><div class="wide" id="famtbl"></div></div>
       </div>
     </section>
 
-    <!-- SELETOR DE VISÃO ESTATÍSTICA (MENSAL vs ACUMULADO POR UF) -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-      <div>
-        <h3 class="text-sm font-bold text-white">Granularidade da Análise Estatística (Itens C e D): <code class="text-blue-400">Total_Arrecadacao</code></h3>
-        <p class="text-xs text-slate-400">Calculado dinamicamente sobre todas as linhas da planilha ativa:</p>
+    <section id="t3">
+      <div class="kpis" id="k3"></div>
+      <div class="card"><h3>Evolução anual da arrecadação</h3><p class="sub">Anos com menos de 12 meses aparecem em tom claro e ficam fora da linha de tendência e das variações.</p><div class="cv"><canvas id="cA"></canvas></div></div>
+      <div class="g2">
+        <div class="card"><h3>Dez maiores UFs (participação no total)</h3><div class="cv"><canvas id="cU"></canvas></div></div>
+        <div class="card"><h3>Participação por grupo de tributo</h3><div class="cv"><canvas id="cF"></canvas></div></div>
       </div>
-      <div class="flex gap-2">
-        <button onclick="mudarEscopo('mensal')" id="btn-mensal" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white">Registros Mensais (Microdados)</button>
-        <button onclick="mudarEscopo('uf')" id="btn-uf" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300 hover:bg-slate-600">Agregado por UF (Soma das UFs)</button>
-      </div>
-    </div>
-
-    <!-- ITENS C & D: TENDÊNCIA CENTRAL, POSIÇÃO E DISPERSÃO -->
-    <section class="grid md:grid-cols-2 gap-6">
-      <div class="card p-6 border-t-4 border-t-emerald-500">
-        <div class="text-xs font-bold uppercase text-emerald-400 mb-1">Item c) Aula 04/09 — Tendência Central e Posição</div>
-        <h2 class="text-lg font-bold text-white mb-4" id="title-c">Medidas Calculadas</h2>
-        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Média Aritmética (x̄)</div>
-            <div class="text-base font-bold text-white" id="c-media">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg border border-emerald-500/40">
-            <div class="text-xs text-emerald-300">Mediana (Md / Q2 - 50%)</div>
-            <div class="text-base font-bold text-emerald-400" id="c-mediana">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">1º Quartil (Q1 - 25%)</div>
-            <div class="text-base font-bold text-white" id="c-q1">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">3º Quartil (Q3 - 75%)</div>
-            <div class="text-base font-bold text-white" id="c-q3">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Percentil 10 (P10) e Mínimo</div>
-            <div class="text-xs font-bold text-slate-200 mt-1" id="c-min">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Percentil 90 (P90) e Máximo</div>
-            <div class="text-xs font-bold text-slate-200 mt-1" id="c-max">—</div>
-          </div>
-        </div>
-        <div class="bg-emerald-950/40 border border-emerald-800/60 rounded-lg p-3 text-xs text-emerald-200" id="c-insight">—</div>
-      </div>
-
-      <div class="card p-6 border-t-4 border-t-amber-500">
-        <div class="text-xs font-bold uppercase text-amber-400 mb-1">Item d) Aula 11/09 — Dispersão e Variabilidade</div>
-        <h2 class="text-lg font-bold text-white mb-4" id="title-d">Variabilidade Calculada</h2>
-        <div class="grid grid-cols-2 gap-3 text-sm mb-4">
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Desvio Padrão Amostral (s)</div>
-            <div class="text-base font-bold text-white" id="d-std">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg border border-amber-500/40">
-            <div class="text-xs text-amber-300">Coeficiente de Variação (CV)</div>
-            <div class="text-base font-bold text-amber-400" id="d-cv">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Amplitude Total (Máx - Mín)</div>
-            <div class="text-base font-bold text-white" id="d-amp">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Intervalo Interquartil (IIQ)</div>
-            <div class="text-base font-bold text-white" id="d-iiq">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Variância Amostral (s²)</div>
-            <div class="text-xs font-bold text-slate-200 mt-1" id="d-var">—</div>
-          </div>
-          <div class="bg-slate-800/80 p-3 rounded-lg">
-            <div class="text-xs text-slate-400">Assimetria (Skewness)</div>
-            <div class="text-xs font-bold text-slate-200 mt-1" id="d-skew">—</div>
-          </div>
-        </div>
-        <div class="bg-amber-950/40 border border-amber-800/60 rounded-lg p-3 text-xs text-amber-200" id="d-insight">—</div>
+      <div class="g2">
+        <div class="card"><h3>Arrecadação por região</h3><div class="wide" id="regtbl"></div></div>
+        <div class="card"><h3>Série anual</h3><div class="scr" id="anotbl"></div></div>
       </div>
     </section>
 
-    <!-- GRÁFICOS DE DISPERSÃO E RANKING (ITENS C, D, E, F) -->
-    <section class="grid lg:grid-cols-2 gap-6">
-      <div class="card p-5 border-t-4 border-t-amber-500">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <span class="text-xs font-bold text-amber-400 uppercase">Item d) Gráfico de Dispersão dos Estados vs. Média</span>
-            <h3 class="text-base font-bold text-white">Espalhamento por UF em relação à Média e Mediana</h3>
-          </div>
-          <span id="badge-cv-uf" class="text-xs bg-amber-950 text-amber-300 border border-amber-700 px-2.5 py-1 rounded font-semibold">—</span>
-        </div>
-        <div class="h-80"><canvas id="chartDispersionUF"></canvas></div>
-      </div>
-
-      <div class="card p-5 border-t-4 border-t-emerald-500">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <span class="text-xs font-bold text-emerald-400 uppercase">Item f) Gráfico de Dispersão (Scatter Plot de Correlação)</span>
-            <h3 class="text-base font-bold text-white">Associação Linear: COFINS × Imposto de Renda por UF (R$ Bi)</h3>
-          </div>
-          <span id="badge-corr-uf" class="text-xs bg-emerald-950 text-emerald-300 border border-emerald-700 px-2.5 py-1 rounded font-semibold">—</span>
-        </div>
-        <div class="h-80"><canvas id="chartScatterUF"></canvas></div>
+    <section id="t4">
+      <div class="note" id="n4"></div>
+      <div class="kpis" id="k4"></div>
+      <div class="g2">
+        <div class="card"><h3>Média e mediana por região</h3><div class="cv s"><canvas id="cP"></canvas></div></div>
+        <div class="card"><h3>Resumo por região</h3><div class="wide" id="regpos"></div></div>
       </div>
     </section>
 
-    <!-- GRÁFICOS DE RANKING POR UF E EVOLUÇÃO ANUAL -->
-    <section class="grid lg:grid-cols-2 gap-6">
-      <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <span class="text-xs font-bold text-purple-400 uppercase">Ranking por UF & Critério de Tukey</span>
-            <h3 class="text-base font-bold text-white">Total por UF vs. Limite de Outlier (Vermelho)</h3>
-          </div>
-          <span id="badge-outliers-uf" class="text-xs bg-rose-950 text-rose-300 border border-rose-700 px-2.5 py-1 rounded font-semibold">—</span>
-        </div>
-        <div class="h-80"><canvas id="chartUF"></canvas></div>
-      </div>
-
-      <div class="card p-5">
-        <div class="flex items-center justify-between mb-3">
-          <div>
-            <span class="text-xs font-bold text-blue-400 uppercase">Evolução Temporal Agregada</span>
-            <h3 class="text-base font-bold text-white">Série Histórica Anual Calculada (R$ Bilhões)</h3>
-          </div>
-          <span id="badge-pico-ano" class="text-xs bg-blue-950 text-blue-300 border border-blue-700 px-2.5 py-1 rounded font-semibold">—</span>
-        </div>
-        <div class="h-80"><canvas id="chartAno"></canvas></div>
+    <section id="t5">
+      <div class="note" id="n5"></div>
+      <div class="kpis" id="k5"></div>
+      <div class="card"><h3>Dispersão dos valores mensais por UF</h3><p class="sub">Cada ponto é um mês de uma UF (escala logarítmica; valores iguais ou menores que zero não aparecem). UFs ordenadas pela arrecadação total.</p><div class="cv"><canvas id="cS"></canvas></div></div>
+      <div class="g2">
+        <div class="card"><h3>Média × desvio-padrão mensal por UF</h3><p class="sub">Pontos acima da linha tracejada têm desvio maior que a média (CV acima de 100%).</p><div class="cv s"><canvas id="cM"></canvas></div></div>
+        <div class="card"><h3>Variabilidade por região</h3><div class="wide" id="regdis"></div></div>
       </div>
     </section>
 
-    <!-- ITEM E: TABELA DE FREQUÊNCIAS, HISTOGRAMA E OUTLIERS -->
-    <section class="grid lg:grid-cols-2 gap-6">
-      <div class="card p-6 border-t-4 border-t-purple-500">
-        <div class="text-xs font-bold uppercase text-purple-400 mb-1">Item e) Aula 18/09 — Tabela de Frequências e Outliers</div>
-        <h2 class="text-lg font-bold text-white mb-3">Distribuição de Frequências (Calculada da Planilha)</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr class="border-b border-slate-700 text-slate-400">
-                <th class="py-2 px-2">Classe de Arrecadação Mensal</th>
-                <th class="py-2 px-2 text-right">fi</th>
-                <th class="py-2 px-2 text-right">fri (%)</th>
-                <th class="py-2 px-2 text-right">Fi</th>
-                <th class="py-2 px-2 text-right">Fri (%)</th>
-              </tr>
-            </thead>
-            <tbody id="freq-tbody" class="divide-y divide-slate-800 text-slate-200"></tbody>
-          </table>
-        </div>
-        <div id="outliers-box" class="mt-4 bg-purple-950/40 border border-purple-800/60 rounded-lg p-3 text-xs text-purple-200">—</div>
+    <section id="t6">
+      <div class="note" id="n6"></div>
+      <div class="g2">
+        <div class="card"><h3>Histograma (classes em escala logarítmica)</h3><div class="cv s"><canvas id="cH"></canvas></div></div>
+        <div class="card"><h3>Tabela de frequência</h3><div class="scr" id="freq"></div></div>
       </div>
+      <div class="card"><h3>Valores atípicos (critério de Tukey)</h3><p class="sub" id="fence"></p><div class="wide" id="outs"></div></div>
+    </section>
 
-      <div class="card p-6 border-t-4 border-t-purple-500 flex flex-col justify-between">
-        <div>
-          <span class="text-xs font-bold text-purple-400 uppercase">Item e) Histograma Dinâmico</span>
-          <h3 class="text-base font-bold text-white mb-3">Frequência Absoluta por Classe</h3>
+    <section id="t7">
+      <div class="note" id="n7"></div>
+      <div class="card">
+        <h3>Diagrama de dispersão entre duas variáveis</h3>
+        <div class="row">
+          <label>Eixo X <select id="px"></select></label>
+          <label>Eixo Y <select id="py"></select></label>
+          <label><input type="checkbox" id="plog" checked> Escala logarítmica</label>
         </div>
-        <div class="h-72"><canvas id="chartHist"></canvas></div>
+        <div class="cv"><canvas id="cR"></canvas></div>
+        <div class="kpis" id="k7" style="margin:16px 0 0"></div>
+      </div>
+      <div class="g2">
+        <div class="card"><h3>Matriz de correlação de Pearson</h3><div class="wide" id="mx"></div></div>
+        <div class="card"><h3>Perfil de tributos por região</h3><p class="sub">Participação de cada grupo na arrecadação da região.</p><div class="wide" id="cross"></div></div>
       </div>
     </section>
 
-    <!-- ITEM F: ASSOCIAÇÃO REGIONAL E MATRIZ DE CORRELAÇÃO DE PEARSON -->
-    <section class="grid lg:grid-cols-2 gap-6">
-      <div class="card p-6 border-t-4 border-t-rose-500">
-        <div class="text-xs font-bold uppercase text-rose-400 mb-1">Item f) Aula 25/09 — Cruzamento Qualitativo × Quantitativo</div>
-        <h2 class="text-lg font-bold text-white mb-3">Arrecadação e Variabilidade por Macrorregião</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr class="border-b border-slate-700 text-slate-400">
-                <th class="py-2 px-2">Região</th>
-                <th class="py-2 px-2 text-right">Soma Total</th>
-                <th class="py-2 px-2 text-right">Part. (%)</th>
-                <th class="py-2 px-2 text-right">Média Mensal</th>
-                <th class="py-2 px-2 text-right">CV (%)</th>
-              </tr>
-            </thead>
-            <tbody id="regiao-tbody" class="divide-y divide-slate-800 text-slate-200"></tbody>
-          </table>
-        </div>
-      </div>
+    <section id="t8"><div class="card"><h3>Principais resultados</h3><ul id="concl"></ul></div></section>
+  </div>
+</main>
+</div>
 
-      <div class="card p-6 border-t-4 border-t-cyan-500">
-        <div class="text-xs font-bold uppercase text-cyan-400 mb-1">Item f) Coeficiente de Correlação de Pearson (r)</div>
-        <h2 class="text-lg font-bold text-white mb-3">Correlações Calculadas Linha a Linha na Planilha</h2>
-        <div id="corr-container" class="space-y-3 text-xs"></div>
-      </div>
-    </section>
+<script>
+const REG={AC:'Norte',AP:'Norte',AM:'Norte',PA:'Norte',RO:'Norte',RR:'Norte',TO:'Norte',AL:'Nordeste',BA:'Nordeste',CE:'Nordeste',MA:'Nordeste',PB:'Nordeste',PE:'Nordeste',PI:'Nordeste',RN:'Nordeste',SE:'Nordeste',DF:'Centro-Oeste',GO:'Centro-Oeste',MT:'Centro-Oeste',MS:'Centro-Oeste',ES:'Sudeste',MG:'Sudeste',RJ:'Sudeste',SP:'Sudeste',PR:'Sul',RS:'Sul',SC:'Sul'};
+const REGC={'Norte':'#0f6b6b','Nordeste':'#c98a1b','Centro-Oeste':'#7a6fb0','Sudeste':'#12263a','Sul':'#b3412e','Outros':'#9aa7b4'};
+const FAM=['IR','COFINS','PIS/PASEP','IPI','Importação','CSLL','Outros'];
+const PAL=['#12263a','#0f6b6b','#c98a1b','#b3412e','#7a6fb0','#3f8fb5','#9aa7b4'];
+const TT=[['Contexto e base','Tema, objetivos e fonte dos dados analisados.'],
+['Tratamento dos dados','Limpeza, padronização e transformação aplicadas antes das análises.'],
+['Panorama da arrecadação','Evolução no tempo, tributos principais e comparação entre estados e regiões.'],
+['Posição e tendência central','Onde está o centro dos dados: média, mediana, classe modal e posições relativas.'],
+['Dispersão e variabilidade','Quanto os valores se afastam do centro e como isso muda entre UFs.'],
+['Distribuição e valores atípicos','Forma da distribuição, frequências e observações fora do padrão.'],
+['Relações entre variáveis','Associação e correlação entre tributos e a arrecadação total.'],
+['Conclusões','Síntese dos resultados calculados.']];
+const $=i=>document.getElementById(i);
+const nf=d=>v=>v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const n0=nf(0),n2=nf(2),n3=nf(3);
+const brl=v=>{const a=Math.abs(v);let s;if(a>=1e12)s=n2(v/1e12)+' tri';else if(a>=1e9)s=n2(v/1e9)+' bi';else if(a>=1e6)s=n2(v/1e6)+' mi';else if(a>=1e3)s=n2(v/1e3)+' mil';else s=n2(v);return 'R$ '+s};
+const pc=v=>n2(v)+'%';
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const famOf=c=>{const u=c.toUpperCase();
+ if(/^IR(PF|PJ|RF)|IMPOSTO DE RENDA/.test(u))return'IR';
+ if(u.startsWith('COFINS'))return'COFINS';
+ if(u.includes('PIS'))return'PIS/PASEP';
+ if(u.startsWith('IPI'))return'IPI';
+ if(u.includes('IMPORTA'))return'Importação';
+ if(u.startsWith('CSLL'))return'CSLL';
+ return'Outros'};
+const kpi=(l,v,s)=>`<div class="kpi"><small>${l}</small><b>${v}</b><span>${s||''}</span></div>`;
+const tbl=(h,r,c)=>`<table class="${c||'num'}"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${r.map(x=>`<tr>${x.map(y=>`<td>${y}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+const note=(t,b)=>`<b>${t}</b>${b}`;
 
-  </main>
+Chart.defaults.font.family="'Source Sans 3',system-ui,sans-serif";
+Chart.defaults.color='#5b6b7b';Chart.defaults.borderColor='#e6ebf0';
+const CH={};
+function mk(id,cfg){if(CH[id])CH[id].destroy();cfg.options=Object.assign({responsive:true,maintainAspectRatio:false},cfg.options||{});CH[id]=new Chart($(id),cfg)}
+const logAx=t=>({type:'logarithmic',title:{display:true,text:t},ticks:{callback:v=>[1,2,5].includes(+String(v)[0])&&/^[125]0*$/.test(String(v))?brl(v):''}});
 
-  <script>
-    const REGIAO_MAP = {
-      AC:'Norte', AP:'Norte', AM:'Norte', PA:'Norte', RO:'Norte', RR:'Norte', TO:'Norte',
-      AL:'Nordeste', BA:'Nordeste', CE:'Nordeste', MA:'Nordeste', PB:'Nordeste', PE:'Nordeste', PI:'Nordeste', RN:'Nordeste', SE:'Nordeste',
-      DF:'Centro-Oeste', GO:'Centro-Oeste', MT:'Centro-Oeste', MS:'Centro-Oeste',
-      ES:'Sudeste', MG:'Sudeste', RJ:'Sudeste', SP:'Sudeste',
-      PR:'Sul', RS:'Sul', SC:'Sul'
-    };
+/* ---------- estatística ---------- */
+const qt=(s,p)=>{const x=(s.length-1)*p,b=Math.floor(x),r=x-b;return s[b+1]!==undefined?s[b]+r*(s[b+1]-s[b]):s[b]};
+function stats(items){
+ const s=[...items].sort((a,b)=>a.val-b.val),v=s.map(d=>d.val),n=v.length,sum=v.reduce((a,b)=>a+b,0),mean=sum/n;
+ let m2=0,m3=0;for(const x of v){const d=x-mean;m2+=d*d;m3+=d*d*d}
+ const variance=n>1?m2/(n-1):0,sd=Math.sqrt(variance),q1=qt(v,.25),q3=qt(v,.75),iiq=q3-q1,hi=q3+1.5*iiq,lo=q1-1.5*iiq;
+ return{n,sum,mean,med:qt(v,.5),q1,q3,p10:qt(v,.1),p90:qt(v,.9),min:s[0],max:s[n-1],amp:v[n-1]-v[0],iiq,variance,sd,cv:mean?sd/Math.abs(mean)*100:0,skew:n>2&&sd?n/((n-1)*(n-2))*m3/sd**3:0,hi,lo,out:s.filter(d=>d.val>hi||d.val<lo).reverse()}}
+function pear(x,y){const n=x.length,mx=avg(x),my=avg(y);let a=0,b=0,c=0;for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;a+=dx*dy;b+=dx*dx;c+=dy*dy}return a/Math.sqrt(b*c)}
+function hist(v){
+ const pos=v.filter(x=>x>0),np=v.length-pos.length;if(pos.length<2)return{bins:[],np};
+ const k=Math.max(4,Math.ceil(1+3.322*Math.log10(pos.length))),lg=pos.map(Math.log10);
+ let mn=Infinity,mx=-Infinity;for(const x of lg){if(x<mn)mn=x;if(x>mx)mx=x}
+ const w=(mx-mn)/k||1,bins=Array.from({length:k},(_,i)=>({lo:10**(mn+i*w),hi:10**(mn+(i+1)*w),fi:0}));
+ for(const x of lg)bins[Math.min(k-1,Math.floor((x-mn)/w))].fi++;return{bins,np}}
+const skewTxt=s=>Math.abs(s)<.5?'aproximadamente simétrica':(s>0?(s>1?'fortemente assimétrica à direita (cauda de valores altos)':'moderadamente assimétrica à direita'):(s<-1?'fortemente assimétrica à esquerda':'moderadamente assimétrica à esquerda'));
+const cvTxt=c=>c<15?'baixa variabilidade':c<30?'variabilidade moderada':'alta variabilidade (a média representa mal as unidades)';
+const rTxt=r=>{const a=Math.abs(r),f=a>=.9?'muito forte':a>=.7?'forte':a>=.4?'moderada':a>=.2?'fraca':'desprezível';return a<.2?f:f+' '+(r>0?'positiva':'negativa')};
 
-    let globalState = { mensal: null, uf: null };
-    let escopoAtivo = 'mensal';
-    let chartUFInstance, chartAnoInstance, chartHistInstance, chartDispersionUFInstance, chartScatterUFInstance;
+/* ---------- carga e preparação ---------- */
+let D=null;
+function build(wb,name){
+ const sn=wb.SheetNames.includes('Dados_Ajustados')?'Dados_Ajustados':wb.SheetNames[0];
+ const raw=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:null});
+ if(!raw.length)throw new Error('A planilha está vazia.');
+ const cols=Object.keys(raw[0]),find=(...n)=>cols.find(c=>n.includes(c.trim().toLowerCase()));
+ const cUF=find('uf'),cAno=find('ano'),cMes=find('mês','mes'),cNum=find('mês_num','mes_num'),cTot=find('total_arrecadacao');
+ if(!cUF||!cAno)throw new Error('Não encontrei as colunas "UF" e "Ano" na planilha.');
+ const skip=new Set([cUF,cAno,cMes,cNum,cTot,find('regiao','região')].filter(Boolean));
+ const taxCols=cols.filter(c=>!skip.has(c)),cf=taxCols.map(famOf);
+ const qa={cel:0,nulos:0,neg:0,nn:0,dup:0,div:0,uf:0,st:0};
+ const seen=new Set(),rows=[];
+ for(const r of raw){
+  const uf=String(r[cUF]??'').trim().toUpperCase(),ano=parseInt(r[cAno],10);
+  if(!uf||!ano)continue;
+  const mn=cNum?parseInt(r[cNum],10)||0:0,f=Object.fromEntries(FAM.map(k=>[k,0]));let soma=0;
+  taxCols.forEach((c,i)=>{qa.cel++;let v=r[c];
+   if(v===null||v===''||v===undefined){qa.nulos++;return}
+   if(typeof v!=='number'){v=Number(String(v).replace(',','.'));if(isNaN(v)){qa.nn++;return}}
+   if(v<0)qa.neg++;soma+=v;f[cf[i]]+=v});
+  let t=r[cTot];if(t===null||t===''||t===undefined||isNaN(Number(t))){qa.st++;t=soma}else t=Number(t);
+  if(Math.abs(t-soma)>1)qa.div++;
+  const k=uf+'|'+ano+'|'+(mn||r[cMes]);if(seen.has(k))qa.dup++;seen.add(k);
+  if(!REG[uf])qa.uf++;
+  rows.push({uf,ano,mn,reg:REG[uf]||'Outros',total:t,f})}
+ if(!rows.length)throw new Error('Nenhuma linha válida (UF e Ano preenchidos).');
+ const byY={};rows.forEach(r=>{const o=byY[r.ano]||(byY[r.ano]={ano:r.ano,sum:0,m:new Set()});o.sum+=r.total;o.m.add(r.mn||r.uf+r.ano)});
+ const anual=Object.values(byY).sort((a,b)=>a.ano-b.ano).map(o=>({ano:o.ano,sum:o.sum,nm:o.m.size,full:o.m.size>=12}));
+ anual.forEach((o,i)=>{const p=anual[i-1];o.yoy=p&&o.full&&p.full&&p.sum?(o.sum/p.sum-1)*100:null;o.avgM=o.sum/o.nm});
+ const fy=anual.filter(o=>o.full),anoRef=(fy.length?fy[fy.length-1]:anual[anual.length-1]).ano;
+ const agg=(rs,kf,lf)=>{const m=new Map();for(const r of rs){const k=kf(r);let o=m.get(k);if(!o){o={label:lf(r),reg:r.reg,val:0,f:Object.fromEntries(FAM.map(x=>[x,0]))};m.set(k,o)}o.val+=r.total;FAM.forEach(x=>o.f[x]+=r.f[x])}return[...m.values()].sort((a,b)=>b.val-a.val)};
+ const sc={
+  mes:rows.map(r=>({label:`${r.uf} ${r.mn?String(r.mn).padStart(2,'0')+'/':''}${r.ano}`,uf:r.uf,reg:r.reg,val:r.total,f:r.f})),
+  uf:agg(rows,r=>r.uf,r=>r.uf),
+  ano:agg(rows.filter(r=>r.ano===anoRef),r=>r.uf,r=>r.uf)};
+ const famCols=FAM.map(k=>({k,n:cf.filter(x=>x===k).length,sum:sc.uf.reduce((a,d)=>a+d.f[k],0)}));
+ D={name,sn,nraw:raw.length,rows,cols:cols.length,ntax:taxCols.length,qa,anual,anoRef,sc,famCols,total:rows.reduce((a,r)=>a+r.total,0)};
+}
 
-    function fmtBRL(val) {
-      const abs = Math.abs(val);
-      if (abs >= 1e12) return 'R$ ' + (val / 1e12).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Tri';
-      if (abs >= 1e9)  return 'R$ ' + (val / 1e9).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bi';
-      if (abs >= 1e6)  return 'R$ ' + (val / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Mi';
-      return 'R$ ' + val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+/* ---------- renderização ---------- */
+const cur=()=>D.sc[$('scope').value];
+function byReg(items){const m={};items.forEach(d=>(m[d.reg]=m[d.reg]||[]).push({val:d.val}));return Object.entries(m).map(([r,a])=>({r,...stats(a)})).sort((a,b)=>b.sum-a.sum)}
+function r1(){
+ const y=D.anual,ufs=D.sc.uf.length;
+ $('k1').innerHTML=kpi('Arrecadação total',brl(D.total),'soma de todo o período')+kpi('Registros',n0(D.rows.length),'UF × mês')+kpi('Período',`${y[0].ano}–${y[y.length-1].ano}`,`${y.length} anos`)+kpi('Unidades da Federação',ufs,'em '+new Set(D.sc.uf.map(d=>d.reg)).size+' regiões')+kpi('Colunas de tributos',D.ntax,'em '+D.famCols.filter(f=>f.n).length+' grupos');
+ $('src1').innerHTML=`<p>Arquivo <b>${D.name}</b>, aba <b>${D.sn}</b>: ${n0(D.nraw)} linhas e ${D.cols} colunas. Cada linha traz a arrecadação de uma UF em um mês, discriminada por tributo, mais o total arrecadado.</p><p class="sub" style="margin:0">Valores nominais, em reais, sem correção por inflação. Todos os números deste painel são calculados no navegador a partir da planilha.</p>`}
+function r2(){
+ const q=D.qa,ok='<span class="ok">Sem ocorrências</span>',w=n=>n?`<span class="warn">${n0(n)}</span>`:ok;
+ $('qa').innerHTML=tbl(['Verificação','Resultado','Tratamento'],[
+  ['Linhas lidas / válidas',`${n0(D.nraw)} / ${n0(D.rows.length)}`,'Linhas sem UF ou ano são descartadas.'],
+  ['Células vazias nos tributos',w(q.nulos)+(q.nulos?` de ${n0(q.cel)}`:''),'Vazio é tratado como zero (sem arrecadação).'],
+  ['Valores não numéricos',w(q.nn),'Convertidos quando possível; caso contrário ignorados.'],
+  ['Valores negativos',`${n0(q.neg)} (${pc(q.neg/q.cel*100)} das células)`,'Mantidos: representam restituições e ajustes; removê-los superestimaria a arrecadação líquida.'],
+  ['Registros duplicados (UF + ano + mês)',w(q.dup),'Verificação de integridade da chave.'],
+  ['UF fora das 27 unidades',w(q.uf),'Classificadas como "Outros".'],
+  ['Total diferente da soma das colunas',w(q.div),'Usa-se o total informado na planilha.'],
+  ['Linhas sem total informado',w(q.st),'Total recalculado pela soma dos tributos.']],'');
+ $('tr').innerHTML=['<b>Padronização:</b> UF em maiúsculas e sem espaços; ano convertido para número.','<b>Tipagem:</b> todas as colunas de tributos tratadas como valores numéricos em reais.','<b>Regionalização:</b> cada UF associada a uma das cinco regiões.','<b>Agrupamento:</b> colunas de tributos reunidas em grupos (IR, COFINS, PIS/PASEP, IPI, Importação, CSLL e outros).','<b>Agregações:</b> totais por UF, por ano e por região, usados nas demais abas.','<b>Anos incompletos:</b> identificados (menos de 12 meses) e excluídos de variações e tendência.'].map(x=>`<li>${x}</li>`).join('');
+ const tf=D.famCols.reduce((a,f)=>a+f.sum,0);
+ $('famtbl').innerHTML=tbl(['Grupo','Colunas','Arrecadação','Part.'],D.famCols.filter(f=>f.n).map(f=>[f.k,f.n,brl(f.sum),pc(f.sum/tf*100)]))}
+function r3(){
+ const a=D.anual,fy=a.filter(o=>o.full),lf=fy[fy.length-1],ff=fy[0],uf=D.sc.uf;
+ const cagr=fy.length>1&&ff.sum>0?((lf.sum/ff.sum)**(1/(lf.ano-ff.ano))-1)*100:null;
+ const top3=uf.slice(0,3).reduce((s,d)=>s+d.val,0)/D.total*100;
+ $('k3').innerHTML=kpi('Último ano completo',lf?brl(lf.sum):'—',lf?String(lf.ano):'')+kpi('Variação no último ano',lf&&lf.yoy!=null?pc(lf.yoy):'—','sobre o ano anterior')+kpi('Crescimento médio anual',cagr==null?'—':pc(cagr),lf?`${ff.ano} a ${lf.ano} (nominal)`:'')+kpi('Maior arrecadadora',uf[0].label,pc(uf[0].val/D.total*100)+' do total')+kpi('Três maiores UFs',pc(top3),'concentração do total');
+ let sl=0,ic=0;if(fy.length>2){const mx=avg(fy.map(o=>o.ano)),my=avg(fy.map(o=>o.sum));let nu=0,de=0;fy.forEach(o=>{nu+=(o.ano-mx)*(o.sum-my);de+=(o.ano-mx)**2});sl=nu/de;ic=my-sl*mx}
+ mk('cA',{data:{labels:a.map(o=>o.ano),datasets:[{type:'bar',label:'Arrecadação (R$ bi)',data:a.map(o=>+(o.sum/1e9).toFixed(2)),backgroundColor:a.map(o=>o.full?PAL[1]:'#a9d0cd')},...(sl?[{type:'line',label:'Tendência linear (anos completos)',data:a.map(o=>o.full?+((ic+sl*o.ano)/1e9).toFixed(2):null),borderColor:PAL[2],borderDash:[6,4],pointRadius:0,spanGaps:true}]:[])]},options:{scales:{y:{title:{display:true,text:'R$ bilhões'}}}}});
+ const t10=uf.slice(0,10);
+ mk('cU',{type:'bar',data:{labels:t10.map(d=>d.label),datasets:[{label:'% do total',data:t10.map(d=>+(d.val/D.total*100).toFixed(2)),backgroundColor:t10.map(d=>REGC[d.reg])}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>pc(c.raw)+' · '+brl(t10[c.dataIndex].val)}}}}});
+ const fm=D.famCols.filter(f=>f.n&&f.sum>0),ft=fm.reduce((s,f)=>s+f.sum,0);
+ mk('cF',{type:'doughnut',data:{labels:fm.map(f=>f.k),datasets:[{data:fm.map(f=>f.sum),backgroundColor:fm.map(f=>PAL[FAM.indexOf(f.k)])}]},options:{plugins:{legend:{position:'right'},tooltip:{callbacks:{label:c=>`${c.label}: ${pc(c.raw/ft*100)} · ${brl(c.raw)}`}}}}});
+ $('regtbl').innerHTML=tbl(['Região','UFs','Arrecadação','Part.'],(()=>{const m={};D.sc.uf.forEach(d=>{const o=m[d.reg]||(m[d.reg]={n:0,s:0});o.n++;o.s+=d.val});return Object.entries(m).sort((x,y)=>y[1].s-x[1].s).map(([r,o])=>[r,o.n,brl(o.s),pc(o.s/D.total*100)])})());
+ $('anotbl').innerHTML=tbl(['Ano','Arrecadação','Média mensal','Var. anual'],a.map(o=>[o.ano+(o.full?'':` <small>(${o.nm} meses)</small>`),brl(o.sum),brl(o.avgM),o.yoy==null?'—':`<span style="color:${o.yoy<0?'var(--neg)':'var(--pri)'}">${(o.yoy>0?'+':'')+pc(o.yoy)}</span>`]))}
+function r4(){
+ const it=cur(),st=stats(it),h=hist(it.map(d=>d.val)),mb=h.bins.length?h.bins.reduce((m,b)=>b.fi>m.fi?b:m):null,rg=byReg(it);
+ const rat=st.med?st.mean/st.med:Infinity;
+ $('n4').innerHTML=note('Como interpretar',`A média (${brl(st.mean)}) é ${rat>1.25?`${n2(rat)} vez(es) a mediana (${brl(st.med)}): poucos valores muito altos puxam o centro para cima, e a mediana descreve melhor a unidade típica.`:`próxima da mediana (${brl(st.med)}), sinal de distribuição equilibrada em torno do centro.`} Os quartis dividem os dados em quatro partes: metade das observações fica entre ${brl(st.q1)} (Q1) e ${brl(st.q3)} (Q3).`);
+ $('k4').innerHTML=kpi('Média',brl(st.mean),`n = ${n0(st.n)}`)+kpi('Mediana (Q2)',brl(st.med),'50% abaixo, 50% acima')+kpi('Classe modal',mb?`${brl(mb.lo)} a ${brl(mb.hi)}`:'—',mb?`${n0(mb.fi)} observações`:'')+kpi('1º quartil (Q1)',brl(st.q1),'25% abaixo')+kpi('3º quartil (Q3)',brl(st.q3),'75% abaixo')+kpi('Percentil 10',brl(st.p10),'')+kpi('Percentil 90',brl(st.p90),'')+kpi('Mínimo',brl(st.min.val),st.min.label)+kpi('Máximo',brl(st.max.val),st.max.label);
+ mk('cP',{type:'bar',data:{labels:rg.map(r=>r.r),datasets:[{label:'Média',data:rg.map(r=>r.mean),backgroundColor:PAL[1]},{label:'Mediana',data:rg.map(r=>r.med),backgroundColor:PAL[2]}]},options:{scales:{y:{ticks:{callback:v=>brl(v)}}},plugins:{tooltip:{callbacks:{label:c=>c.dataset.label+': '+brl(c.raw)}}}}});
+ $('regpos').innerHTML=tbl(['Região','n','Média','Mediana','Máx.'],rg.map(r=>[r.r,n0(r.n),brl(r.mean),brl(r.med),brl(r.max.val)]))}
+function r5(){
+ const st=stats(cur());
+ $('n5').innerHTML=note('Como interpretar',`O desvio-padrão (${brl(st.sd)}) mede o afastamento típico em relação à média. O coeficiente de variação (CV = desvio ÷ média) é de ${pc(st.cv)}: ${cvTxt(st.cv)}. A distribuição é ${skewTxt(st.skew)} (assimetria = ${n2(st.skew)}). Como as UFs têm portes muito diferentes, a dispersão é naturalmente grande; os gráficos abaixo mostram onde ela se concentra.`);
+ $('k5').innerHTML=kpi('Amplitude',brl(st.amp),'máximo − mínimo')+kpi('Intervalo interquartil',brl(st.iiq),'Q3 − Q1')+kpi('Variância',`${st.variance.toExponential(2).replace('.',',').replace('e+',' × 10^')} R$²`,'em reais ao quadrado')+kpi('Desvio-padrão',brl(st.sd),'amostral')+kpi('Coeficiente de variação',pc(st.cv),cvTxt(st.cv))+kpi('Assimetria',n2(st.skew),skewTxt(st.skew));
+ const order=D.sc.uf.map(d=>d.label),ix=Object.fromEntries(order.map((u,i)=>[u,i])),regs=[...new Set(D.sc.mes.map(d=>d.reg))];
+ mk('cS',{type:'scatter',data:{datasets:regs.map(rg=>({label:rg,backgroundColor:REGC[rg]+'aa',pointRadius:1.8,data:D.sc.mes.filter(d=>d.reg===rg&&d.val>0).map((d,i)=>({x:ix[d.uf]+((i*37%100)/100-.5)*.7,y:d.val,l:d.label}))}))},options:{animation:false,scales:{x:{min:-.5,max:order.length-.5,ticks:{stepSize:1,autoSkip:false,maxRotation:90,font:{size:10},callback:v=>Number.isInteger(v)?order[v]:''},grid:{display:false}},y:logAx('Arrecadação mensal')},plugins:{tooltip:{callbacks:{label:c=>c.raw.l+': '+brl(c.raw.y)}}}}});
+ const m={};D.sc.mes.forEach(d=>(m[d.uf]=m[d.uf]||{reg:d.reg,a:[]}).a.push({val:d.val}));
+ const pu=Object.entries(m).map(([u,o])=>({u,reg:o.reg,...stats(o.a)})).filter(p=>p.mean>0&&p.sd>0);
+ const lo=Math.min(...pu.map(p=>Math.min(p.mean,p.sd))),hi=Math.max(...pu.map(p=>Math.max(p.mean,p.sd)));
+ mk('cM',{type:'scatter',data:{datasets:[...regs.map(rg=>({label:rg,backgroundColor:REGC[rg],pointRadius:5,data:pu.filter(p=>p.reg===rg).map(p=>({x:p.mean,y:p.sd,l:p.u}))})),{type:'line',label:'CV = 100%',data:[{x:lo,y:lo},{x:hi,y:hi}],borderColor:'#9aa7b4',borderDash:[5,4],pointRadius:0}]},options:{scales:{x:logAx('Média mensal'),y:logAx('Desvio-padrão mensal')},plugins:{tooltip:{callbacks:{label:c=>c.raw.l?`${c.raw.l}: média ${brl(c.raw.x)}, DP ${brl(c.raw.y)}, CV ${pc(c.raw.y/c.raw.x*100)}`:'CV = 100%'}}}}});
+ $('regdis').innerHTML=tbl(['Região','Média','Desvio-padrão','CV'],byReg(cur()).map(r=>[r.r,brl(r.mean),brl(r.sd),pc(r.cv)]))}
+function r6(){
+ const it=cur(),st=stats(it),v=it.map(d=>d.val),h=hist(v),b=h.bins,mi=b.length?b.reduce((m,x,i)=>x.fi>b[m].fi?i:m,0):-1;
+ $('n6').innerHTML=note('Como interpretar',`Os valores de arrecadação se concentram em ${b.length?`${brl(b[mi].lo)} a ${brl(b[mi].hi)}`:'—'} e a distribuição é ${skewTxt(st.skew)}. Por isso as classes do histograma crescem em escala logarítmica: com classes de mesma largura, quase tudo cairia na primeira barra. Pelo critério de Tukey, são atípicos os valores fora de [Q1 − 1,5 × IIQ; Q3 + 1,5 × IIQ]: encontramos <b>${n0(st.out.length)}</b> de ${n0(st.n)} (${pc(st.out.length/st.n*100)}).`);
+ if(b.length)mk('cH',{type:'bar',data:{labels:b.map(x=>brl(x.lo)+' – '+brl(x.hi)),datasets:[{label:'Frequência',data:b.map(x=>x.fi),backgroundColor:b.map((x,i)=>i===mi?PAL[2]:PAL[1])}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:60,font:{size:10}}},y:{title:{display:true,text:'Frequência'}}}}});
+ let ac=0;const rows=b.map(x=>{ac+=x.fi;return[`${brl(x.lo)} a ${brl(x.hi)}`,n0(x.fi),pc(x.fi/v.length*100),pc(ac/v.length*100)]});
+ if(h.np)rows.unshift(['Zero ou negativo',n0(h.np),pc(h.np/v.length*100),'—']);
+ $('freq').innerHTML=tbl(['Classe','fi','fr','Fac'],rows);
+ $('fence').textContent=`Limite inferior: ${brl(st.lo)} · Limite superior: ${brl(st.hi)} · IIQ: ${brl(st.iiq)}`;
+ const med=st.med;$('outs').innerHTML=st.out.length?tbl(['Observação','Valor','Múltiplo da mediana'],st.out.slice(0,12).map(d=>[d.label,brl(d.val),med>0?n2(d.val/med)+'×':'—']))+(st.out.length>12?`<p class="sub">Mostrando 12 de ${n0(st.out.length)}.</p>`:''):'<p>Nenhum valor atípico nesta unidade de análise.</p>'}
+function popSel(){
+ const opts=['Total',...D.famCols.filter(f=>f.n&&f.sum!==0).map(f=>f.k)];
+ const o=opts.map(k=>`<option value="${k}">${k==='Total'?'Arrecadação total':k}</option>`).join('');
+ $('px').innerHTML=o;$('py').innerHTML=o;$('px').value=opts.includes('COFINS')?'COFINS':opts[0];$('py').value=opts.includes('IR')?'IR':opts[Math.min(1,opts.length-1)]}
+const gv=(d,k)=>k==='Total'?d.val:d.f[k];
+function r7(){
+ const it=cur(),a=$('px').value,b=$('py').value,lg=$('plog').checked;
+ let pts=it.map(d=>({x:gv(d,a),y:gv(d,b),l:d.label,r:d.reg}));if(lg)pts=pts.filter(p=>p.x>0&&p.y>0);
+ if(pts.length<3){$('k7').innerHTML='<p>Poucos pontos para calcular a correlação.</p>';return}
+ const t=lg?Math.log10:x=>x,inv=lg?x=>10**x:x=>x,X=pts.map(p=>t(p.x)),Y=pts.map(p=>t(p.y)),r=pear(X,Y),mx=avg(X),my=avg(Y);
+ let nu=0,de=0;X.forEach((x,i)=>{nu+=(x-mx)*(Y[i]-my);de+=(x-mx)**2});const sl=nu/de,ic=my-sl*mx;
+ let x0=Infinity,x1=-Infinity;pts.forEach(p=>{if(p.x<x0)x0=p.x;if(p.x>x1)x1=p.x});
+ const regs=[...new Set(pts.map(p=>p.r))],lb=k=>k==='Total'?'Arrecadação total':k;
+ mk('cR',{type:'scatter',data:{datasets:[...regs.map(rg=>({label:rg,backgroundColor:REGC[rg]+(pts.length>200?'88':''),pointRadius:pts.length>200?2:6,data:pts.filter(p=>p.r===rg)})),{type:'line',label:'Reta de regressão',data:[{x:x0,y:inv(ic+sl*t(x0))},{x:x1,y:inv(ic+sl*t(x1))}],borderColor:PAL[3],borderWidth:2,pointRadius:0}]},options:{animation:pts.length<500,scales:{x:lg?logAx(lb(a)):{title:{display:true,text:lb(a)},ticks:{callback:v=>brl(v)}},y:lg?logAx(lb(b)):{title:{display:true,text:lb(b)},ticks:{callback:v=>brl(v)}}},plugins:{tooltip:{callbacks:{label:c=>c.raw.l?`${c.raw.l}: X ${brl(c.raw.x)} · Y ${brl(c.raw.y)}`:'Reta de regressão'}}}}});
+ $('k7').innerHTML=kpi('Correlação de Pearson (r)',n3(r),rTxt(r))+kpi('Determinação (r²)',pc(r*r*100),'variação de Y explicada por X')+kpi(lg?'Elasticidade (inclinação)':'Inclinação',n3(sl),lg?'+1% em X ≈ +'+n2(sl)+'% em Y':'R$ de Y por R$ de X')+kpi('Pontos (n)',n0(pts.length),lg?'escala log: só valores > 0':'');
+ $('n7').innerHTML=note('Como interpretar',`O coeficiente r varia de −1 a +1: perto de +1, as duas variáveis crescem juntas; perto de 0, não há associação linear. Entre <b>${lb(a)}</b> e <b>${lb(b)}</b>, r = ${n3(r)} (${rTxt(r)}). Correlação não implica causa: tributos de UFs grandes tendem a ser altos em conjunto simplesmente por causa do tamanho da economia local.`)}
+function r7b(){
+ const it=cur(),vars=['Total',...D.famCols.filter(f=>f.n&&f.sum!==0).map(f=>f.k)],lb=k=>k==='Total'?'Total':k;
+ const vec=k=>it.map(d=>gv(d,k));
+ const cell=r=>{const a=Math.abs(r);return`<td style="text-align:center;background:${r>=0?`rgba(15,107,107,${a*.7})`:`rgba(179,65,46,${a*.7})`};color:${a>.55?'#fff':'inherit'}">${n2(r)}</td>`};
+ $('mx').innerHTML=`<table><thead><tr><th></th>${vars.map(k=>`<th style="text-align:center">${lb(k)}</th>`).join('')}</tr></thead><tbody>${vars.map(a=>`<tr><th>${lb(a)}</th>${vars.map(b=>cell(a===b?1:pear(vec(a),vec(b)))).join('')}</tr>`).join('')}</tbody></table>`;
+ const fm=D.famCols.filter(f=>f.n&&f.sum!==0).map(f=>f.k),m={};
+ D.sc.uf.forEach(d=>{const o=m[d.reg]||(m[d.reg]={s:0,f:Object.fromEntries(fm.map(k=>[k,0]))});fm.forEach(k=>{o.f[k]+=d.f[k];o.s+=d.f[k]})});
+ $('cross').innerHTML=`<table><thead><tr><th>Região</th>${fm.map(k=>`<th style="text-align:center">${k}</th>`).join('')}</tr></thead><tbody>${Object.entries(m).sort((x,y)=>y[1].s-x[1].s).map(([r,o])=>`<tr><th>${r}</th>${fm.map(k=>{const p=o.s?o.f[k]/o.s*100:0;return`<td style="text-align:center;background:rgba(201,138,27,${Math.max(0,Math.min(p,70))/100});">${pc(p)}</td>`}).join('')}</tr>`).join('')}</tbody></table>`}
+function r8(){
+ const a=D.anual,fy=a.filter(o=>o.full),lf=fy[fy.length-1],ff=fy[0],uf=D.sc.uf,su=stats(uf),L=[];
+ L.push(`<b>Volume:</b> a base soma ${brl(D.total)} entre ${a[0].ano} e ${a[a.length-1].ano}, em ${n0(D.rows.length)} registros de ${uf.length} UFs.`);
+ if(fy.length>1&&ff.sum>0){const c=((lf.sum/ff.sum)**(1/(lf.ano-ff.ano))-1)*100;L.push(`<b>Tendência:</b> entre ${ff.ano} e ${lf.ano} a arrecadação cresceu ${pc(c)} ao ano em média (valores nominais)${lf.yoy!=null?`; em ${lf.ano} a variação foi de ${pc(lf.yoy)}`:''}.`)}
+ const best=fy.filter(o=>o.yoy!=null);if(best.length){const mx=best.reduce((m,o)=>o.yoy>m.yoy?o:m),mn=best.reduce((m,o)=>o.yoy<m.yoy?o:m);L.push(`<b>Variações extremas:</b> maior alta anual em ${mx.ano} (${pc(mx.yoy)}) e menor variação em ${mn.ano} (${pc(mn.yoy)}).`)}
+ const t3=uf.slice(0,3);L.push(`<b>Concentração:</b> ${t3.map(d=>d.label).join(', ')} respondem por ${pc(t3.reduce((s,d)=>s+d.val,0)/D.total*100)} do total; ${uf[0].label} sozinha tem ${pc(uf[0].val/D.total*100)}.`);
+ const rg=byReg(uf);L.push(`<b>Regiões:</b> a região ${rg[0].r} lidera, com ${pc(rg[0].sum/D.total*100)} da arrecadação${rg.length>1?`; ${rg[rg.length-1].r} tem a menor participação (${pc(rg[rg.length-1].sum/D.total*100)})`:''}.`);
+ const fm=D.famCols.filter(f=>f.n&&f.sum>0).sort((x,y)=>y.sum-x.sum),ft=fm.reduce((s,f)=>s+f.sum,0);if(fm.length)L.push(`<b>Tributos:</b> ${fm[0].k} é o maior grupo (${pc(fm[0].sum/ft*100)})${fm[1]?`, seguido de ${fm[1].k} (${pc(fm[1].sum/ft*100)})`:''}.`);
+ L.push(`<b>Distribuição entre UFs:</b> média de ${brl(su.mean)} contra mediana de ${brl(su.med)}, CV de ${pc(su.cv)} e ${su.out.length} UF(s) atípica(s)${su.out.length?` (${su.out.slice(0,4).map(d=>d.label).join(', ')})`:''}. A distribuição é ${skewTxt(su.skew)}.`);
+ const vs=['Total',...fm.map(f=>f.k)];let bp=null;for(let i=0;i<vs.length;i++)for(let j=i+1;j<vs.length;j++){const r=pear(uf.map(d=>gv(d,vs[i])),uf.map(d=>gv(d,vs[j])));if(!isNaN(r)&&(!bp||Math.abs(r)>Math.abs(bp.r)))bp={r,a:vs[i],b:vs[j]}}
+ if(bp)L.push(`<b>Relações:</b> entre as UFs, a associação mais forte é entre ${bp.a==='Total'?'a arrecadação total':bp.a} e ${bp.b==='Total'?'a arrecadação total':bp.b} (r = ${n2(bp.r)}). Essas correlações refletem sobretudo o porte econômico de cada UF.`);
+ L.push(`<b>Limitações:</b> valores nominais, sem deflação, e sem indicador per capita, pois a base não traz população por UF.`);
+ $('concl').innerHTML=L.map(x=>`<li>${x}</li>`).join('')}
 
-    function calcQuantile(sortedArr, q) {
-      const pos = (sortedArr.length - 1) * q;
-      const base = Math.floor(pos);
-      const rest = pos - base;
-      if (sortedArr[base + 1] !== undefined) {
-        return sortedArr[base] + rest * (sortedArr[base + 1] - sortedArr[base]);
-      }
-      return sortedArr[base];
-    }
+function renderScope(){r4();r5();r6();r7();r7b()}
+function renderAll(){
+ $('scope').innerHTML=`<option value="uf">Total acumulado por UF</option><option value="ano">${D.anoRef} por UF</option><option value="mes">Observações mensais (UF × mês)</option>`;
+ popSel();r1();r2();r3();renderScope();r8();
+ $('empty').style.display='none';$('content').style.display='block';
+ $('st').textContent=`${D.name}: ${n0(D.rows.length)} linhas, ${D.cols} colunas`;show(1)}
 
-    function calcularEstatisticasVetor(items) {
-      const sorted = [...items].sort((a, b) => a.val - b.val);
-      const vals = sorted.map(d => d.val);
-      const n = vals.length;
-      const sum = vals.reduce((a, b) => a + b, 0);
-      const mean = sum / n;
-      const median = calcQuantile(vals, 0.50);
-      const q1 = calcQuantile(vals, 0.25);
-      const q3 = calcQuantile(vals, 0.75);
-      const p10 = calcQuantile(vals, 0.10);
-      const p90 = calcQuantile(vals, 0.90);
-      const minObj = sorted[0];
-      const maxObj = sorted[n - 1];
-      const amp = maxObj.val - minObj.val;
-      const iiq = q3 - q1;
-
-      let m2 = 0, m3 = 0;
-      for (let i = 0; i < n; i++) {
-        const diff = vals[i] - mean;
-        m2 += diff * diff;
-        m3 += diff * diff * diff;
-      }
-      const variance = m2 / (n - 1);
-      const std = Math.sqrt(variance);
-      const cv = (std / mean) * 100;
-      const skew = (n / ((n - 1) * (n - 2))) * (m3 / Math.pow(std, 3));
-
-      const lsTukey = q3 + 1.5 * iiq;
-      const outliers = sorted.filter(d => d.val > lsTukey);
-
-      return { n, sum, mean, median, q1, q3, p10, p90, minObj, maxObj, amp, iiq, variance, std, cv, skew, lsTukey, outliers };
-    }
-
-    function calcPearson(x, y) {
-      const n = x.length;
-      let sumX = 0, sumY = 0;
-      for (let i = 0; i < n; i++) { sumX += x[i]; sumY += y[i]; }
-      const meanX = sumX / n, meanY = sumY / n;
-      let num = 0, denX = 0, denY = 0;
-      for (let i = 0; i < n; i++) {
-        const dx = x[i] - meanX;
-        const dy = y[i] - meanY;
-        num += dx * dy;
-        denX += dx * dx;
-        denY += dy * dy;
-      }
-      return num / Math.sqrt(denX * denY);
-    }
-
-    function processarWorkbook(workbook, nomeArquivo) {
-      const sheetName = workbook.SheetNames.includes('Dados_Ajustados') ? 'Dados_Ajustados' : workbook.SheetNames[0];
-      const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
-      if (!rawRows.length) return alert('A planilha selecionada está vazia!');
-
-      let celulasNulasCorrigidas = 0;
-      let valoresNegativosRestituicao = 0;
-      const ignoreCols = new Set(['Ano', 'Mês', 'Mês_Num', 'UF', 'Regiao', 'Total_Arrecadacao']);
-      const allCols = Object.keys(rawRows[0]);
-      const taxCols = allCols.filter(c => !ignoreCols.has(c));
-
-      const silverRows = rawRows.map(r => {
-        const uf = String(r['UF'] || '').trim().toUpperCase();
-        const ano = parseInt(r['Ano'], 10) || 0;
-        const mes = String(r['Mês'] || '').trim();
-        const regiao = REGIAO_MAP[uf] || 'Outros';
-
-        let somaImpostos = 0;
-        taxCols.forEach(col => {
-          let v = r[col];
-          if (v === null || v === undefined || v === '') { celulasNulasCorrigidas++; v = 0; }
-          const num = Number(v) || 0;
-          if (num < 0) valoresNegativosRestituicao++;
-          somaImpostos += num;
-        });
-
-        const total = (r['Total_Arrecadacao'] !== undefined && r['Total_Arrecadacao'] !== '')
-          ? Number(r['Total_Arrecadacao'])
-          : somaImpostos;
-
-        const irTotal = (Number(r['IRPF'])||0) + (Number(r['IRPJ - ENTIDADES FINANCEIRAS'])||0) +
-                        (Number(r['IRPJ - DEMAIS EMPRESAS'])||0) + (Number(r['IRRF - RENDIMENTOS DO TRABALHO'])||0) +
-                        (Number(r['IRRF - RENDIMENTOS DO CAPITAL'])||0) + (Number(r['IRRF - REMESSAS P/ EXTERIOR'])||0) +
-                        (Number(r['IRRF - OUTROS RENDIMENTOS'])||0);
-        const cofinsTotal = (Number(r['COFINS'])||0) + (Number(r['COFINS - FINANCEIRAS'])||0) + (Number(r['COFINS - DEMAIS'])||0);
-        const pisTotal = (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP'])||0) + (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP - FINANCEIRAS'])||0) + (Number(r['CONTRIBUIÇÃO PARA O PIS/PASEP - DEMAIS'])||0);
-        const ipiTotal = (Number(r['IPI - FUMO'])||0) + (Number(r['IPI - BEBIDAS'])||0) + (Number(r['IPI - AUTOMÓVEIS'])||0) + (Number(r['IPI - VINCULADO À IMPORTACAO'])||0) + (Number(r['IPI - OUTROS'])||0);
-        const impImportacao = Number(r['IMPOSTO SOBRE IMPORTAÇÃO']) || 0;
-
-        return { uf, ano, mes, regiao, total, irTotal, cofinsTotal, pisTotal, ipiTotal, impImportacao };
-      }).filter(r => r.uf && r.ano > 0);
-
-      const itemsMensal = silverRows.map(r => ({ val: r.total, label: `${r.uf} (${r.mes}/${r.ano})` }));
-      const statsMensal = calcularEstatisticasVetor(itemsMensal);
-
-      const mapUF = {};
-      silverRows.forEach(r => {
-        if (!mapUF[r.uf]) mapUF[r.uf] = { val: 0, cofinsBi: 0, irBi: 0, regiao: r.regiao };
-        mapUF[r.uf].val += r.total;
-        mapUF[r.uf].cofinsBi += r.cofinsTotal / 1e9;
-        mapUF[r.uf].irBi += r.irTotal / 1e9;
-      });
-      const itemsUF = Object.entries(mapUF).map(([uf, d]) => ({
-        val: d.val,
-        label: uf,
-        regiao: d.regiao,
-        cofinsBi: +d.cofinsBi.toFixed(2),
-        irBi: +d.irBi.toFixed(2)
-      })).sort((a, b) => b.val - a.val);
-      const statsUF = calcularEstatisticasVetor(itemsUF);
-
-      const mapAno = {};
-      silverRows.forEach(r => { mapAno[r.ano] = (mapAno[r.ano] || 0) + r.total; });
-      const serieAno = Object.entries(mapAno).map(([ano, val]) => ({ ano: Number(ano), val: val / 1e9 })).sort((a, b) => a.ano - b.ano);
-
-      globalState = { mensal: statsMensal, uf: statsUF };
-
-      const anosUnicos = serieAno.map(d => d.ano);
-      document.getElementById('statusBanner').className = 'text-xs font-semibold text-emerald-400';
-      document.getElementById('statusBanner').innerText = `✔ Processado ao vivo da planilha: ${nomeArquivo} (Aba: ${sheetName} | ${silverRows.length.toLocaleString('pt-BR')} linhas × ${allCols.length} colunas)`;
-      document.getElementById('meta-rows').innerText = `${silverRows.length.toLocaleString('pt-BR')} linhas`;
-      document.getElementById('meta-period').innerText = `Período: ${Math.min(...anosUnicos)} a ${Math.max(...anosUnicos)} (${anosUnicos.length} anos)`;
-      document.getElementById('meta-sum').innerText = fmtBRL(statsMensal.sum);
-      document.getElementById('meta-ufs').innerText = `${itemsUF.length} Unidades da Federação × ${taxCols.length} rubricas`;
-
-      document.getElementById('etl-log').innerHTML = `
-        <li>✔ <strong>Validação de Schema:</strong> ${allCols.length} colunas lidas (${taxCols.length} rubricas tributárias).</li>
-        <li>✔ <strong>Limpeza de Nulos:</strong> ${celulasNulasCorrigidas} células vazias convertidas para <code>0.00</code>.</li>
-        <li>✔ <strong>Retificações Contábeis:</strong> ${valoresNegativosRestituicao.toLocaleString('pt-BR')} ocorrências negativas preservadas (restituições oficiais RFB).</li>
-        <li>✔ <strong>Feature Engineering:</strong> Mapeamento automático das 27 UFs nas 5 Macrorregiões e soma de <code>Total_Arrecadacao</code>.</li>
-      `;
-
-      const faixas = [
-        { nome: 'Até R$ 100 milhões', min: -Infinity, max: 1e8, fi: 0 },
-        { nome: 'R$ 100 mi a R$ 500 mi', min: 1e8, max: 5e8, fi: 0 },
-        { nome: 'R$ 500 mi a R$ 1 bi', min: 5e8, max: 1e9, fi: 0 },
-        { nome: 'R$ 1 bi a R$ 5 bilhões', min: 1e9, max: 5e9, fi: 0 },
-        { nome: 'R$ 5 bi a R$ 20 bilhões', min: 5e9, max: 2e10, fi: 0 },
-        { nome: 'Acima de R$ 20 bilhões', min: 2e10, max: Infinity, fi: 0 }
-      ];
-      silverRows.forEach(r => {
-        const f = faixas.find(b => r.total > b.min && r.total <= b.max);
-        if (f) f.fi++;
-      });
-      const maxFi = Math.max(...faixas.map(f => f.fi));
-      let acumFi = 0;
-      document.getElementById('freq-tbody').innerHTML = faixas.map(f => {
-        acumFi += f.fi;
-        const fri = (f.fi / silverRows.length) * 100;
-        const Fri = (acumFi / silverRows.length) * 100;
-        const isModal = f.fi === maxFi;
-        return `<tr class="${isModal ? 'bg-purple-950/40 font-bold text-purple-200' : ''}">
-          <td class="py-2 px-2">${f.nome} ${isModal ? '(Classe Modal)' : ''}</td>
-          <td class="py-2 px-2 text-right">${f.fi.toLocaleString('pt-BR')}</td>
-          <td class="py-2 px-2 text-right">${fri.toFixed(2)}%</td>
-          <td class="py-2 px-2 text-right">${acumFi.toLocaleString('pt-BR')}</td>
-          <td class="py-2 px-2 text-right">${Fri.toFixed(2)}%</td>
-        </tr>`;
-      }).join('');
-
-      const ufsOutliersNomes = statsUF.outliers.map(d => `${d.label} (${fmtBRL(d.val)})`).reverse().join(', ');
-      document.getElementById('outliers-box').innerHTML = `
-        <strong>Outliers Calculados Dinamicamente (Tukey: LS = Q3 + 1,5 × IIQ):</strong><br/>
-        • <strong>No Acumulado por UF (LS = ${fmtBRL(statsUF.lsTukey)}):</strong> ${statsUF.outliers.length} estados atípicos → <strong>${ufsOutliersNomes}</strong>.<br/>
-        • <strong>Nos Microdados Mensais (LS = ${fmtBRL(statsMensal.lsTukey)}):</strong> <strong>${statsMensal.outliers.length.toLocaleString('pt-BR')} meses atípicos</strong> (${((statsMensal.outliers.length / statsMensal.n)*100).toFixed(2)}% do total).
-      `;
-      document.getElementById('badge-outliers-uf').innerText = `Outliers (> ${fmtBRL(statsUF.lsTukey)}): ${statsUF.outliers.map(d => d.label).reverse().join(', ')}`;
-      document.getElementById('badge-cv-uf').innerText = `CV UF = ${statsUF.cv.toFixed(2).replace('.', ',')}% | IIQ = ${fmtBRL(statsUF.iiq)}`;
-
-      const rUF = calcPearson(itemsUF.map(d => d.cofinsBi), itemsUF.map(d => d.irBi));
-      document.getElementById('badge-corr-uf').innerText = `Pearson r = ${rUF.toFixed(4).replace('.', ',')} (UF)`;
-
-      const picoAnoObj = [...serieAno].sort((a, b) => b.val - a.val)[0];
-      document.getElementById('badge-pico-ano').innerText = `Pico: ${picoAnoObj.ano} (R$ ${picoAnoObj.val.toFixed(2)} Bi)`;
-
-      const gruposRegiao = {};
-      silverRows.forEach(r => {
-        if (!gruposRegiao[r.regiao]) gruposRegiao[r.regiao] = [];
-        gruposRegiao[r.regiao].push({ val: r.total, label: r.uf });
-      });
-      const listaRegioes = Object.entries(gruposRegiao).map(([reg, arr]) => {
-        const st = calcularEstatisticasVetor(arr);
-        return { reg, sum: st.sum, share: (st.sum / statsMensal.sum) * 100, mean: st.mean, cv: st.cv };
-      }).sort((a, b) => b.sum - a.sum);
-
-      document.getElementById('regiao-tbody').innerHTML = listaRegioes.map(r => `
-        <tr>
-          <td class="py-2 px-2 font-semibold text-white">${r.reg}</td>
-          <td class="py-2 px-2 text-right">${fmtBRL(r.sum)}</td>
-          <td class="py-2 px-2 text-right text-emerald-400 font-semibold">${r.share.toFixed(2)}%</td>
-          <td class="py-2 px-2 text-right">${fmtBRL(r.mean)}</td>
-          <td class="py-2 px-2 text-right">${r.cv.toFixed(2)}%</td>
-        </tr>
-      `).join('');
-
-      const vecTotal = silverRows.map(r => r.total);
-      const vecIR = silverRows.map(r => r.irTotal);
-      const vecCofins = silverRows.map(r => r.cofinsTotal);
-      const vecPis = silverRows.map(r => r.pisTotal);
-      const vecIpi = silverRows.map(r => r.ipiTotal);
-      const vecImp = silverRows.map(r => r.impImportacao);
-
-      const paresCorr = [
-        { nome: 'COFINS Total × PIS/PASEP Total', desc: 'Tributos incidentes sobre o faturamento empresarial', r: calcPearson(vecCofins, vecPis) },
-        { nome: 'Imposto de Renda Total × Arrecadação Total', desc: 'Impacto direto do IR na receita total do Estado', r: calcPearson(vecIR, vecTotal) },
-        { nome: 'COFINS Total × Imposto de Renda Total', desc: 'Associação entre faturamento corporativo e renda/lucro', r: calcPearson(vecCofins, vecIR) },
-        { nome: 'IPI Total × Imposto sobre Importação', desc: 'Relação entre atividade industrial e comércio externo', r: calcPearson(vecIpi, vecImp) }
-      ];
-      document.getElementById('corr-container').innerHTML = paresCorr.map(p => `
-        <div class="bg-slate-800/80 p-3 rounded-lg flex items-center justify-between">
-          <div>
-            <div class="font-bold text-white">${p.nome}</div>
-            <div class="text-slate-400">${p.desc}</div>
-          </div>
-          <span class="text-base font-extrabold text-emerald-400">r = ${p.r.toFixed(4).replace('.', ',')}</span>
-        </div>
-      `).join('');
-
-      mudarEscopo(escopoAtivo);
-      desenharGraficos(itemsUF, statsUF, serieAno, faixas);
-    }
-
-    function mudarEscopo(escopo) {
-      escopoAtivo = escopo;
-      document.getElementById('btn-mensal').className = escopo === 'mensal' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300';
-      document.getElementById('btn-uf').className = escopo === 'uf' ? 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 text-slate-300';
-
-      const st = globalState[escopo];
-      if (!st) return;
-
-      const sufixo = escopo === 'mensal' ? `(Microdados Mensais N = ${st.n.toLocaleString('pt-BR')})` : `(Acumulado por UF N = ${st.n})`;
-      document.getElementById('title-c').innerText = `Medidas de Posição ${sufixo}`;
-      document.getElementById('title-d').innerText = `Medidas de Dispersão ${sufixo}`;
-
-      document.getElementById('c-media').innerText = fmtBRL(st.mean);
-      document.getElementById('c-mediana').innerText = fmtBRL(st.median);
-      document.getElementById('c-q1').innerText = fmtBRL(st.q1);
-      document.getElementById('c-q3').innerText = fmtBRL(st.q3);
-      document.getElementById('c-min').innerText = `P10: ${fmtBRL(st.p10)} | Mín: ${fmtBRL(st.minObj.val)} (${st.minObj.label})`;
-      document.getElementById('c-max').innerText = `P90: ${fmtBRL(st.p90)} | Máx: ${fmtBRL(st.maxObj.val)} (${st.maxObj.label})`;
-
-      document.getElementById('d-std').innerText = fmtBRL(st.std);
-      document.getElementById('d-cv').innerText = `${st.cv.toFixed(2).replace('.', ',')}%`;
-      document.getElementById('d-amp').innerText = fmtBRL(st.amp);
-      document.getElementById('d-iiq').innerText = fmtBRL(st.iiq);
-      document.getElementById('d-var').innerText = `${st.variance.toExponential(4).replace('.', ',')} (R$)²`;
-      document.getElementById('d-skew').innerText = `+${st.skew.toFixed(2).replace('.', ',')} (Assimetria Positiva)`;
-
-      document.getElementById('c-insight').innerHTML = `<strong>Análise Automática:</strong> A Média (${fmtBRL(st.mean)}) é <strong>${(st.mean / st.median).toFixed(1)}x maior</strong> que a Mediana (${fmtBRL(st.median)}), confirmando que poucos valores extremos puxam a média para cima.`;
-      document.getElementById('d-insight').innerHTML = `<strong>Análise Automática:</strong> Coeficiente de Variação de <strong>${st.cv.toFixed(2).replace('.', ',')}%</strong> (muito acima do limiar de 30%), comprovando matematicamente a elevada dispersão regional e temporal.`;
-    }
-
-    function desenharGraficos(itemsUF, statsUF, serieAno, faixas) {
-      Chart.defaults.color = '#94a3b8';
-      Chart.defaults.borderColor = '#334155';
-      const lsTukeyUF = statsUF.lsTukey;
-      const meanBi = +(statsUF.mean / 1e9).toFixed(2);
-      const medBi = +(statsUF.median / 1e9).toFixed(2);
-
-      // 1. Gráfico de Dispersão Visual dos Estados (Item D)
-      if (chartDispersionUFInstance) chartDispersionUFInstance.destroy();
-      chartDispersionUFInstance = new Chart(document.getElementById('chartDispersionUF'), {
-        type: 'scatter',
-        data: {
-          datasets: [
-            {
-              label: 'Estados (Ranking vs Arrecadação R$ Bi)',
-              data: itemsUF.map((d, idx) => ({ x: idx + 1, y: +(d.val / 1e9).toFixed(2), uf: d.label, reg: d.regiao })),
-              backgroundColor: itemsUF.map(d => d.val > lsTukeyUF ? '#f43f5e' : '#38bdf8'),
-              pointRadius: 6,
-              pointHoverRadius: 9
-            },
-            {
-              type: 'line',
-              label: `Média UF (R$ ${meanBi} Bi)`,
-              data: [{ x: 1, y: meanBi }, { x: itemsUF.length, y: meanBi }],
-              borderColor: '#f59e0b',
-              borderDash: [6, 4],
-              borderWidth: 2,
-              pointRadius: 0
-            },
-            {
-              type: 'line',
-              label: `Mediana UF (R$ ${medBi} Bi)`,
-              data: [{ x: 1, y: medBi }, { x: itemsUF.length, y: medBi }],
-              borderColor: '#10b981',
-              borderDash: [4, 4],
-              borderWidth: 2,
-              pointRadius: 0
-            }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { title: { display: true, text: 'Posição da UF no Ranking (1º ao 27º)', color: '#94a3b8' }, min: 0, max: 28 },
-            y: { title: { display: true, text: 'Arrecadação Acumulada (R$ Bilhões)', color: '#94a3b8' } }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: (ctx) => ctx.raw.uf ? `${ctx.raw.uf} (${ctx.raw.reg}): R$ ${ctx.raw.y} Bi | Desvio da Média: R$ ${(ctx.raw.y - meanBi).toFixed(2)} Bi` : ctx.dataset.label
-              }
-            }
-          }
-        }
-      });
-
-      // 2. Gráfico de Dispersão COFINS vs IR (Item F)
-      if (chartScatterUFInstance) chartScatterUFInstance.destroy();
-      const pts = itemsUF.map(d => ({ x: d.cofinsBi, y: d.irBi, uf: d.label, reg: d.regiao, val: d.val }));
-      const n = pts.length;
-      const sx = pts.reduce((a, b) => a + b.x, 0), sy = pts.reduce((a, b) => a + b.y, 0);
-      const mx = sx / n, my = sy / n;
-      let num = 0, den = 0;
-      pts.forEach(p => { num += (p.x - mx) * (p.y - my); den += (p.x - mx) ** 2; });
-      const slope = den ? (num / den) : 0, intercept = my - slope * mx;
-      const maxX = Math.max(...pts.map(p => p.x));
-
-      chartScatterUFInstance = new Chart(document.getElementById('chartScatterUF'), {
-        type: 'scatter',
-        data: {
-          datasets: [
-            {
-              label: 'Estados (COFINS × IR em R$ Bi)',
-              data: pts,
-              backgroundColor: pts.map(d => d.val > lsTukeyUF ? '#f43f5e' : '#10b981'),
-              pointRadius: 6,
-              pointHoverRadius: 9
-            },
-            {
-              type: 'line',
-              label: 'Tendência Linear',
-              data: [{ x: 0, y: intercept }, { x: maxX, y: slope * maxX + intercept }],
-              borderColor: '#e2e8f0',
-              borderDash: [5, 5],
-              borderWidth: 1.8,
-              pointRadius: 0
-            }
-          ]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          scales: {
-            x: { title: { display: true, text: 'COFINS Acumulada (R$ Bilhões)', color: '#94a3b8' } },
-            y: { title: { display: true, text: 'Imposto de Renda Acumulado (R$ Bilhões)', color: '#94a3b8' } }
-          },
-          plugins: {
-            tooltip: {
-              callbacks: {
-                label: (ctx) => ctx.raw.uf ? `${ctx.raw.uf} (${ctx.raw.reg}): COFINS R$ ${ctx.raw.x} Bi | IR R$ ${ctx.raw.y} Bi` : ctx.dataset.label
-              }
-            }
-          }
-        }
-      });
-
-      // 3. Gráfico de Barras por UF
-      if (chartUFInstance) chartUFInstance.destroy();
-      chartUFInstance = new Chart(document.getElementById('chartUF'), {
-        type: 'bar',
-        data: {
-          labels: itemsUF.map(d => d.label),
-          datasets: [{
-            label: 'Total Acumulado (R$ Bi)',
-            data: itemsUF.map(d => +(d.val / 1e9).toFixed(2)),
-            backgroundColor: itemsUF.map(d => d.val > lsTukeyUF ? '#f43f5e' : '#3b82f6'),
-            borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
-
-      // 4. Gráfico de Linha por Ano
-      if (chartAnoInstance) chartAnoInstance.destroy();
-      chartAnoInstance = new Chart(document.getElementById('chartAno'), {
-        type: 'line',
-        data: {
-          labels: serieAno.map(d => d.ano),
-          datasets: [{
-            label: 'Arrecadação Anual (R$ Bi)',
-            data: serieAno.map(d => +d.val.toFixed(2)),
-            borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.15)',
-            fill: true, tension: 0.25, pointRadius: 3
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
-
-      // 5. Histograma
-      if (chartHistInstance) chartHistInstance.destroy();
-      chartHistInstance = new Chart(document.getElementById('chartHist'), {
-        type: 'bar',
-        data: {
-          labels: faixas.map(f => f.nome.replace('R$ ', '')),
-          datasets: [{
-            label: 'Frequência Absoluta (fi)',
-            data: faixas.map(f => f.fi),
-            backgroundColor: '#a855f7', borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-      });
-    }
-
-    // Procura automaticamente a planilha na raiz ou em data/bronze/ no repositório GitHub Pages
-    async function carregarPlanilhaPadrao() {
-      const caminhosPossiveis = [
-        './arrecadacao-estado-tratado.xlsx',
-        './data/bronze/arrecadacao-estado-tratado.xlsx',
-        'arrecadacao-estado-tratado.xlsx'
-      ];
-      document.getElementById('statusBanner').innerText = '⏳ Lendo arrecadacao-estado-tratado.xlsx diretamente do repositório...';
-
-      for (const caminho of caminhosPossiveis) {
-        try {
-          const resp = await fetch(caminho);
-          if (resp.ok) {
-            const buf = await resp.arrayBuffer();
-            const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
-            processarWorkbook(wb, caminho);
-            return;
-          }
-        } catch (err) {
-          // tenta o próximo caminho
-        }
-      }
-
-      document.getElementById('statusBanner').className = 'text-xs font-semibold text-amber-400';
-      document.getElementById('statusBanner').innerText = '⚠️ Planilha .xlsx não encontrada no diretório do GitHub Pages ou aberto via file://. Clique no botão azul "Carregar Planilha" no topo e selecione o arquivo arrecadacao-estado-tratado.xlsx!';
-    }
-
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
-        processarWorkbook(wb, file.name);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-
-    carregarPlanilhaPadrao();
-  </script>
+/* ---------- navegação e carga ---------- */
+function show(i){
+ document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id==='t'+i));
+ document.querySelectorAll('#tabs button').forEach((b,k)=>b.classList.toggle('on',k===i-1));
+ $('ttl').textContent=TT[i-1][0];$('sub').textContent=TT[i-1][1];
+ $('scopebar').style.visibility=i>=4&&i<=7?'visible':'hidden';
+ setTimeout(()=>Object.values(CH).forEach(c=>c.resize()),30)}
+$('tabs').innerHTML=TT.map((t,i)=>`<button data-i="${i+1}">${t[0]}</button>`).join('');
+$('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&D)show(+b.dataset.i)});
+$('scope').addEventListener('change',renderScope);
+['px','py','plog'].forEach(id=>$(id).addEventListener('change',r7));
+function fail(msg){$('content').style.display='none';$('empty').style.display='block';$('st').textContent='Sem dados carregados';
+ $('empty').innerHTML=`<h3>Não foi possível carregar a planilha</h3><p>${msg}</p><p>Para abrir os dados, use <b>Carregar outra planilha</b> no menu e selecione o arquivo <code>arrecadacao-estado-tratado.xlsx</code>. Para o carregamento automático, deixe o arquivo na mesma pasta do <code>index.html</code> e abra a página por um servidor (como o GitHub Pages), não direto do disco.</p>`}
+function load(buf,name){try{build(XLSX.read(new Uint8Array(buf),{type:'array'}),name);renderAll()}catch(e){fail(e.message)}}
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>load(ev.target.result,f.name);r.readAsArrayBuffer(f)});
+fetch('arrecadacao-estado-tratado.xlsx').then(r=>{if(!r.ok)throw new Error('Arquivo arrecadacao-estado-tratado.xlsx não encontrado ao lado da página.');return r.arrayBuffer()}).then(b=>load(b,'arrecadacao-estado-tratado.xlsx')).catch(e=>fail(e.message));
+</script>
 </body>
 </html>
